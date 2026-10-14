@@ -35,9 +35,7 @@ Each problem folder also has a PDF of its README for offline reading.
 
 ### System design
 
-| Design | Focus | Status |
-|---|---|---|
-| [Talent Scout: agentic recruiting system](system-design/agentic-talent-dossier/) | LLM planner + checked DAG, durable orchestration, matching people to online accounts, prompt-injection quarantine, grounded generation, fairness and compliance | ✅ |
+Full designs of AI systems, from the architecture down to failure modes, evaluation and responsible AI. *Coming soon.*
 
 ---
 
