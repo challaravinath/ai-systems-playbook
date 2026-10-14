@@ -1,0 +1,15 @@
+# .NET
+bin/
+obj/
+TestResults/
+*.user
+.vs/
+.vscode/
+.idea/
+
+# build-pdf temp pages
+.build-pdf-*.html
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,25 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  dotnet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Test every problem
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t solutions < <(git ls-files '*.slnx' '*.sln')
+          if [ ${#solutions[@]} -eq 0 ]; then echo "no solutions found"; exit 1; fi
+          for s in "${solutions[@]}"; do
+            echo "::group::$s"
+            dotnet test "$s" --nologo
+            echo "::endgroup::"
+          done
