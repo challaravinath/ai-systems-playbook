@@ -1,4 +1,4 @@
-# AI Systems Field Guide
+# AI Systems Playbook
 
 **Data structures, algorithms and system design, worked through the way real AI systems use them.**
 
