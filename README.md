@@ -2,7 +2,9 @@
 
 **Data structures, algorithms and system design, worked through the way real AI systems use them.**
 
-Coding rounds for senior and staff AI roles still test graphs, heaps, hashing, dynamic programming and concurrency. What has changed is the setting: *"run this agent's plan in parallel"*, *"evict from the prompt cache"*, *"pack retrieved chunks into the context window"*. This guide pairs each classic pattern with a real AI problem, shows where companies run it in production (with sources), and solves it in C# with tests that run.
+Underneath every AI system are old, well-understood ideas: graphs, heaps, hashing, dynamic programming, concurrency. An agent running its plan is a topological sort. A prompt cache is a radix tree with LRU eviction. Packing retrieved chunks into a context window is a knapsack problem.
+
+This playbook takes one real AI problem at a time and works it through properly: why the problem exists, where companies run the algorithm in production (with sources), how to solve it and why it's correct, what breaks at scale, and C# code with tests that run.
 
 [![tests](../../actions/workflows/test.yml/badge.svg)](../../actions/workflows/test.yml)
 
@@ -10,16 +12,16 @@ Coding rounds for senior and staff AI roles still test graphs, heaps, hashing, d
 
 ## What every problem contains
 
-1. **The prompt**, as an interviewer would say it, with hints you can expand, so you can try it first.
+1. **The problem**, stated plainly, with hints you can expand, so you can try it first.
 2. **Where it runs in the real world:** which companies use this algorithm, for what, with links to their docs, papers or engineering posts.
-3. **Clarifying questions**, and how each answer changes the design.
+3. **The questions that shape the design**, and how each answer changes it.
 4. **The mental model:** the one idea that carries the solution.
 5. **Brute force → optimal**, with complexity, and the trade-offs between designs.
-6. **Invariants** to say out loud, which are what the person interviewing you is grading.
+6. **Invariants:** the properties that make the solution correct.
 7. **C# code with tests that run**, each test named after the behaviour it protects.
-8. **A ladder of follow-ups**, from scale to durability to distribution, with strong answers.
-9. **From interview answer to production:** observability, failure, security.
-10. **What each level shows** (shallow / senior / staff) and a 45-minute pacing plan.
+8. **Going further:** what real systems need next (scale, durability, distribution) and how to get there.
+9. **From working code to production:** observability, failure, security.
+10. **Common mistakes**, and why each one hurts.
 
 Each problem folder also has a PDF of its README for offline reading.
 
@@ -81,7 +83,7 @@ node tools/build-pdf.mjs dsa/track-01-graphs/p01-agent-dag-executor/README.md
 
 ## A note on sources
 
-Company examples come from public documentation, papers and engineering posts, linked in each problem. Internal systems change over time; describe them as *"publicly described as…"*. The designs here are original study material, not any company's internal system or interview questions.
+Company examples come from public documentation, papers and engineering posts, linked in each problem. Internal systems change over time; describe them as *"publicly described as…"*. The designs here are original work, not any company's internal system.
 
 ## License
 

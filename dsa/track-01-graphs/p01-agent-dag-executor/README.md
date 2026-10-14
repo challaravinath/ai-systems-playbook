@@ -2,17 +2,17 @@
 ### Run an LLM's plan as a DAG: in parallel, in order, with failures contained
 
 **Tracks:** Graphs (topological sort, cycle detection, DP on a DAG) × Concurrency (C# async, channels, cancellation)
-**Level:** Senior → Staff · **Round length:** 45 min for Parts A–C, then follow-ups
+**Reading time:** about 40 minutes, longer if you try it yourself first
 **Code:** `src/AgentDag/Plan.cs`, `src/AgentDag/DagExecutor.cs` · **Tests:** 23, run with `dotnet test`
 
 ---
 
-## 0. The prompt, as an interviewer would say it
+## 0. The problem
 
 > "Our agent turns a user request into a plan: a list of steps, each with the steps it depends on. A step is a tool call or a model call, for example `retrieve`, `score`, `web_lookup`, `write_dossier`.
-> Write the component that runs the plan. Steps should run in parallel when they can, but never more than **K** at a time, because our tools have quotas. A step gets its parents' outputs. Tell me what happens when a step fails, hangs, or the user cancels."
+> Write the component that runs the plan. Steps should run in parallel when they can, but never more than **K** at a time, because our tools have quotas. A step gets its parents' outputs. Decide what happens when a step fails, hangs, or the user cancels."
 
-**Try it before you read on.** Give yourself 35 minutes in an empty file. Hints, if you need them:
+**Try it before you read on.** It sticks far better if you've struggled with it first. Hints, if you need them:
 
 <details><summary>Hint 1</summary>A step can start when its <i>count of unfinished parents</i> reaches zero. What data structure holds the steps whose count is zero?</details>
 <details><summary>Hint 2</summary>If many tasks decrement shared counters, you need locks. Can a <b>single</b> loop own all the counters while workers only report "I'm done"?</details>
@@ -36,11 +36,11 @@ The pattern is a **dependency count plus a ready queue**, which is Kahn's topolo
 | **Google: TensorFlow** | The dataflow graph of ops | An op runs when its inputs are ready, and independent ops run in parallel across devices | [TensorFlow, OSDI '16](https://www.usenix.org/conference/osdi16/technical-sessions/presentation/abadi) |
 | **OpenAI: Ray** (Anyscale) | Task graphs built from futures | A task runs when the futures it depends on resolve. OpenAI said publicly it uses Ray to train its largest models | [Anyscale: Ray Summit 2022 LLM stories](https://www.anyscale.com/blog/ray-summit-2022-stories-large-language-models); [HPCwire](https://www.hpcwire.com/bigdatawire/2023/02/10/anyscale-bolsters-ray-the-super-scalable-framework-used-to-train-chatgpt/) |
 
-**Why AI teams ask it now:** every agent framework is turning from a loop into a graph. The questions that matter in production are now graph and concurrency questions: whether the plan is valid, how fast it can run, what happens when step 7 of 12 times out, and how you stay under a quota of 5 GitHub calls at a time.
+**Why it matters more now:** every agent framework is turning from a loop into a graph. The questions that matter in production are now graph and concurrency questions: whether the plan is valid, how fast it can run, what happens when step 7 of 12 times out, and how you stay under a quota of 5 GitHub calls at a time.
 
 ---
 
-## 2. Clarify before coding (and the answers I'll assume)
+## 2. Questions that shape the design (and the answers assumed here)
 
 | Ask | Why it changes the design | Assume |
 |---|---|---|
@@ -85,14 +85,14 @@ Three ideas carry the whole problem:
 3. Pop a node, append it to the order, and decrement each of its children; a child that reaches 0 goes into the ready set.
 4. If `order.Count < V`, the plan has a cycle.
 
-**Naming the cycle (staff detail):**
+**Naming the cycle (the detail that makes it useful):**
 - "Has a cycle" is useless to the planner LLM that has to repair the plan.
 - Every node left with indegree > 0 has at least one parent that is also stuck.
 - So walk parent links *within the stuck set* until a node repeats. That loop is a real cycle, found iteratively, so a 100,000-node chain can't overflow the stack. A test proves this.
 
 **Why Kahn rather than DFS three-colour?** Both are O(V+E). Kahn produces the order the executor needs, doesn't recurse, and matches how the executor runs. DFS is fine if you convert it to an explicit stack.
 
-**Validation the interviewer may not ask for, but a staff engineer adds:**
+**Validation that LLM-written plans make necessary:**
 - duplicate ids;
 - dependencies on unknown nodes (the LLM made up a tool);
 - self-loops;
@@ -123,7 +123,7 @@ Here W is the total work and T∞ is the critical path. In words: you're never w
 
 | Design | Sketch | Problem |
 |---|---|---|
-| **Level by level** | Group nodes by depth; `await Task.WhenAll(level)` for each level | **Barrier waste.** One slow node in level 1 holds up every node in level 2, even ones that don't depend on it. With a 2 s lookup beside 50 ms scoring calls, the whole next level waits 2 s. *The most common mid-level answer.* |
+| **Level by level** | Group nodes by depth; `await Task.WhenAll(level)` for each level | **Barrier waste.** One slow node in level 1 holds up every node in level 2, even ones that don't depend on it. With a 2 s lookup beside 50 ms scoring calls, the whole next level waits 2 s. *The most common first attempt.* |
 | **Task per node, awaiting its parents** | `tasks[v] = Run(async () => { await Task.WhenAll(parents); await sem.WaitAsync(); try { … } finally { sem.Release(); } })` | Elegant and correct for the happy path. But you can't choose *which* ready node gets the next slot (the semaphore wakes waiters FIFO), failures arrive as exceptions in many places, and every node's task exists from the start |
 | **Scheduler loop + completion channel** ✅ | One loop owns the counters and ready heap, starts up to K, and awaits one completion at a time | A little more code, but priorities, failure policy, cancellation and accounting all live in **one place** |
 
@@ -159,7 +159,7 @@ while (true)
 }
 ```
 
-### 6.3 Invariants (say these out loud; they are what the interviewer is grading)
+### 6.3 Invariants (the properties that make it correct)
 
 1. **0 ≤ running ≤ K**, always. The loop is the only place that changes `running`.
 2. **A node starts only after all its parents have *succeeded*.** It is enqueued only when `waitingOn` reaches 0, and that only happens on success.
@@ -178,7 +178,7 @@ while (true)
 | The tool ignores its token | `WaitAsync(token)` stops *waiting* on it, so the run continues; the stray work is reported in metrics | Same |
 | The user cancels | In-flight nodes see the token and end as Cancelled; unstarted nodes are Cancelled | Same |
 
-### 6.5 C# concurrency points that separate senior from staff
+### 6.5 C# concurrency details that matter here
 
 - **`Channel<T>` with `SingleReader = true`** for completions. It is lock-free in practice and keeps the single-owner model honest.
 - **`Task.Yield()` at the top of each worker.** A work function that blocks *before* its first `await` would otherwise run on the scheduler's thread and stall the loop.
@@ -187,7 +187,7 @@ while (true)
 - **Dispose every `CancellationTokenSource`** (`using`). A linked CTS registers with its parent and leaks if not disposed.
 - **`ConfigureAwait(false)` in library code**, so it can't deadlock against a caller's synchronisation context.
 - **Never `.Result` or `.Wait()`** on async work. Sync-over-async deadlocks and exhausts the thread pool.
-- **For a flat fan-out with no edges**, `Parallel.ForEachAsync(items, new ParallelOptions { MaxDegreeOfParallelism = K }, …)` is the built-in. Mention it, and say why it doesn't handle dependencies.
+- **For a flat fan-out with no edges**, `Parallel.ForEachAsync(items, new ParallelOptions { MaxDegreeOfParallelism = K }, …)` is the built-in, but it has no notion of dependencies, which is why it isn't enough here.
 - **Retry only idempotent work.** `ctx.Attempt` exists so a tool can reuse the same idempotency key on every attempt, so a retried "charge" or "send email" doesn't happen twice.
 
 ### 6.6 Complexity
@@ -220,7 +220,7 @@ while (true)
 
 ---
 
-## 8. Follow-up ladder (what comes next, and a strong answer)
+## 8. Going further: what real systems need next
 
 **F1. "The plan says 'for each shortlisted candidate, run lookup → dossier'. You don't know how many until runtime."**
 - *Dynamic fan-out.* Add a `Map` node whose output is a list. When it succeeds, the scheduler **expands** a templated sub-graph per item and rewires the join.
@@ -268,7 +268,7 @@ while (true)
 
 ---
 
-## 9. From interview answer to production
+## 9. From working code to production
 
 | Concern | What I'd add |
 |---|---|
@@ -280,32 +280,21 @@ while (true)
 
 ---
 
-## 10. Common mistakes, and what each level tends to show
+## 10. Common mistakes, and why they hurt
 
-| Topic | Shallow answer | Senior | Staff |
+| Topic | Common mistake | What goes wrong | Better |
 |---|---|---|---|
-| Ordering | Runs nodes in the order listed | Kahn's algorithm | Kahn's with a named cycle, a deterministic tie-break and no recursion |
-| Parallelism | `Task.WhenAll` on everything (no K), or level by level | Semaphore-limited tasks | Scheduler loop + channel; explains barrier waste and FIFO-wakeup limits |
-| Failure | One exception kills the process | try/catch, retries | Retry classification, idempotency, a policy per run, every node accounted for |
-| Cancellation | Not mentioned | Passes a token | Distinguishes timeout from cancellation, handles tools that ignore the token, never abandons in-flight work |
-| Performance | Not mentioned | Big-O | Critical path as an SLO bound, the `W/K + T∞` bound, critical-path-first ordering |
-| Beyond the box | — | Mentions retries | Durability via an event log, per-resource limits, distribution through leases and fencing |
+| Ordering | Run nodes in the order they're listed | A node runs before its inputs exist | Kahn's algorithm, with a named cycle, a deterministic tie-break and no recursion |
+| Parallelism | `Task.WhenAll` on everything | No limit, so tool quotas are blown and the run gets 429s | Cap concurrency at K |
+| Parallelism | Level by level | Barrier waste: fast branches wait for slow, unrelated ones | A scheduler loop that starts each node the moment its own inputs are ready |
+| Shared state | Many tasks decrementing shared counters | Lost updates: a node never becomes ready and the run hangs silently | One owner of all state; workers report through a channel |
+| Failure | One exception ends everything | Partial results that were fine are thrown away | Retry only transient errors, use idempotency keys, choose a failure policy per run, give every node a final status |
+| Cancellation | Ignored, or only half handled | Orphaned work keeps running and spending quota | Tell timeout apart from cancellation, guard against tools that ignore the token, never abandon in-flight work |
+| Performance | Only Big-O | No idea whether the deadline is even reachable | Critical path as the lower bound, `W/K + T∞` as the upper bound, critical-path-first ordering |
 
 ---
 
-## 11. Pacing in a 45-minute round
-
-| Minutes | Do |
-|---|---|
-| 0–5 | Clarify (§2). Say the mental model in one sentence: *"Kahn's algorithm run live, with one loop owning the counters."* |
-| 5–15 | Part A: build, validate, name the cycle. Write two tests in your head: a cycle, and a duplicate edge |
-| 15–35 | Part C: the loop. Say invariants 1–5 *before* writing the code. Then the failure policy, timeouts and cancellation |
-| 35–40 | Part B: critical path and why it's the SLO lower bound; critical-path-first ordering |
-| 40–45 | Pick two follow-ups to raise yourself: **F3 durability** and **F2 per-resource limits**. Raising them unprompted counts for a lot at staff level |
-
----
-
-## 12. Run it
+## 11. Run it
 
 ```bash
 cd dsa/track-01-graphs/p01-agent-dag-executor
@@ -326,4 +315,4 @@ Requires .NET 10 SDK.
 - Google: [Bazel reaches beta (Google Open Source Blog)](https://opensource.googleblog.com/2015/09/building-build-system-bazel-reaches-beta.html) · [TensorFlow, OSDI '16](https://www.usenix.org/conference/osdi16/technical-sessions/presentation/abadi)
 - OpenAI / Ray: [Anyscale: Ray Summit 2022](https://www.anyscale.com/blog/ray-summit-2022-stories-large-language-models) · [HPCwire](https://www.hpcwire.com/bigdatawire/2023/02/10/anyscale-bolsters-ray-the-super-scalable-framework-used-to-train-chatgpt/)
 
-*Company details come from public posts and docs, as of when they were published. Internal systems change; describe them in an interview as "publicly described as…".*
+*Company details come from public posts and docs, as of when they were published. Internal systems change; read them as "publicly described as…".*

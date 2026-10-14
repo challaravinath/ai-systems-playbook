@@ -64,4 +64,4 @@ A living plan. Problems are built in roughly this order; the order changes as I 
 ## Later
 
 - **More DSA:** BM25 from scratch; k-means; mixture-of-experts token routing; speculative decoding acceptance; tokenizer (byte-pair encoding) merges; reservoir sampling for eval sets.
-- **Practice formats:** timed mock prompts per problem; a "mixed bag" set that doesn't tell you the pattern.
+- **Practice sets:** a "mixed bag" of problems that don't say which pattern they need, so you learn to spot it.
