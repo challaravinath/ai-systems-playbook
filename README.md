@@ -41,7 +41,11 @@ Full designs of AI systems, from the architecture down to failure modes, evaluat
 
 ## Roadmap
 
-Tracks planned, each with problems in the format above:
+**Up next:** P02 *Learning path from a pile of docs* (SCCs, condensation DAG) · P03 *Prefix-cache radix tree with LRU* · P04 *Per-tenant rate limiter*.
+
+The full plan, 25 problems and 12 system designs, is in **[ROADMAP.md](ROADMAP.md)**. Each DSA problem builds a component that a later design uses: the rate limiter and the retries become parts of the AI gateway, the radix tree and the batcher become parts of inference serving.
+
+Problems are grouped into tracks by pattern:
 
 | Track | Patterns | Example AI problems |
 |---|---|---|
