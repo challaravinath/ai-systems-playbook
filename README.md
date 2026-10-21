@@ -87,12 +87,6 @@ cd dsa/graphs/agent-plan-executor
 dotnet test
 ```
 
-To rebuild a PDF after editing a README (needs Node 18+ and Chrome):
-
-```bash
-node tools/build-pdf.mjs dsa/graphs/agent-plan-executor/README.md
-```
-
 ---
 
 ## A note on sources
