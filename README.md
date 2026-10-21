@@ -49,6 +49,7 @@ I write one LinkedIn post a week about a problem in this repo. Each post links t
 | Post | Problem |
 |---|---|
 | [Agent loops vs agent plans](https://lnkd.in/p/dKuhFZhE) | [Agent plan executor](dsa/graphs/agent-plan-executor/) |
+| [Prefix caching in LLM serving](https://lnkd.in/p/dp9yJrcK) | [Prefix-cache radix tree](dsa/trees-and-tries/prefix-cache-radix-tree/) |
 
 ---
 
