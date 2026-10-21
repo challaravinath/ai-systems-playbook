@@ -2,7 +2,7 @@
 
 **Data structures, algorithms and system design, worked through the way real AI systems use them.**
 
-Underneath every AI system are old, well-understood ideas: graphs, heaps, hashing, dynamic programming, concurrency. An agent running its plan is a topological sort. A prompt cache is a radix tree with LRU eviction. Packing retrieved chunks into a context window is a knapsack problem.
+Underneath every AI system are old, well-understood ideas: graphs, heaps, hashing, dynamic programming, concurrency. An agent running its plan is a topological sort. A prompt cache can be a radix tree with LRU eviction. Packing retrieved chunks into a context window is a knapsack problem.
 
 This playbook takes one real AI problem at a time and works it through properly: why the problem exists, where companies run the algorithm in production (with sources), how to solve it and why it's correct, what breaks at scale, and C# code with tests that run.
 
