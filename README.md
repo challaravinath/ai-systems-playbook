@@ -42,6 +42,16 @@ Full designs of AI systems, from the architecture down to failure modes, evaluat
 
 ---
 
+## Posts
+
+I write one LinkedIn post a week about a problem in this repo. Each post links to its folder here, and each folder is listed below with its post.
+
+| Post | Problem |
+|---|---|
+| [Agent loops vs agent plans](https://lnkd.in/p/dKuhFZhE) | [Agent plan executor](dsa/graphs/agent-plan-executor/) |
+
+---
+
 ## Roadmap
 
 **Up next:** *Learning path from a pile of docs* (SCCs, condensation DAG); *Per-tenant rate limiter*; *Dynamic batcher*.
