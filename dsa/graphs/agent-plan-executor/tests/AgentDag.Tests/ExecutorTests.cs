@@ -70,9 +70,7 @@ public class ExecutorTests
     [Fact]
     public async Task One_candidates_failed_lookup_skips_only_its_own_dossier()
     {
-        //        ┌ lookup_ana ─ dossier_ana ┐
-        // shortlist                         panel_pack
-        //        └ lookup_bo  ─ dossier_bo  ┘
+        // shortlist feeds lookup_ana and lookup_bo. Each lookup feeds its own dossier, and both dossiers feed panel_pack.
         var plan = Plan.Build([
             new PlanNode("shortlist"),
             new PlanNode("lookup_ana", "shortlist"), new PlanNode("dossier_ana", "lookup_ana"),

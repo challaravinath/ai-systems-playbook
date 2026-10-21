@@ -13,7 +13,7 @@ public enum FailurePolicy
 }
 
 /// <summary>What a node's work function receives.</summary>
-/// <param name="Inputs">Parent id → parent output. Only parents, never the whole run state (least privilege).</param>
+/// <param name="Inputs">Each parent's id mapped to its output. Only parents, never the whole run state (least privilege).</param>
 /// <param name="Attempt">1-based. Lets idempotent tools reuse the same idempotency key across retries.</param>
 /// <param name="Cancellation">Fires on run cancellation, fail-fast, or this attempt's timeout. Work must observe it.</param>
 public sealed record NodeContext(string NodeId, IReadOnlyDictionary<string, object?> Inputs, int Attempt, CancellationToken Cancellation);

@@ -11,7 +11,7 @@ public sealed record PlanNode(string Id, IReadOnlyList<string> DependsOn, TimeSp
 
 public sealed class PlanValidationException(string message, IReadOnlyList<string>? cycle = null) : Exception(message)
 {
-    /// <summary>When the plan has a cycle: the nodes on it, first node repeated at the end (a → b → a).</summary>
+    /// <summary>When the plan has a cycle: the nodes on it, first node repeated at the end (a, b, a).</summary>
     public IReadOnlyList<string>? Cycle { get; } = cycle;
 }
 
@@ -92,7 +92,7 @@ public sealed class Plan
         {
             var stuck = indegree.Where(kv => kv.Value > 0).Select(kv => kv.Key).ToHashSet(StringComparer.Ordinal);
             var cycle = FindCycle(stuck, parents);
-            throw new PlanValidationException($"Plan has a cycle: {string.Join(" → ", cycle)}.", cycle);
+            throw new PlanValidationException($"Plan has a cycle through {string.Join(", ", cycle)}.", cycle);
         }
 
         return new Plan(map, parents,
