@@ -2,7 +2,7 @@
 
 **Data structures, algorithms and system design, worked through the way real AI systems use them.**
 
-Underneath every AI system are old, well-understood ideas: graphs, heaps, hashing, dynamic programming, concurrency. An agent running its plan is a topological sort. A prompt cache is a radix tree with LRU eviction. Packing retrieved chunks into a context window is a knapsack problem.
+Underneath every AI system are old, well-understood ideas: graphs, heaps, hashing, dynamic programming, concurrency. An agent running its plan is a topological sort. A prompt cache can be a radix tree with LRU eviction. Packing retrieved chunks into a context window is a knapsack problem.
 
 This playbook takes one real AI problem at a time and works it through properly: why the problem exists, where companies run the algorithm in production (with sources), how to solve it and why it's correct, what breaks at scale, and C# code with tests that run.
 
@@ -39,6 +39,16 @@ Each problem folder also has a PDF of its README for offline reading.
 ### System design
 
 Full designs of AI systems, from the architecture down to failure modes, evaluation and responsible AI. *Coming soon.*
+
+---
+
+## Posts
+
+I write one LinkedIn post a week about a problem in this repo. Each post links to its folder here, and each folder is listed below with its post.
+
+| Post | Problem |
+|---|---|
+| [Agent loops vs agent plans](https://lnkd.in/p/dKuhFZhE) | [Agent plan executor](dsa/graphs/agent-plan-executor/) |
 
 ---
 

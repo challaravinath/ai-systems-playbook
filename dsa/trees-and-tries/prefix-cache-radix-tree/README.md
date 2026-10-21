@@ -173,7 +173,7 @@ Both are correct. It mostly comes down to how the engine already manages KV memo
 
 ## 7. A worked run: a recruiting agent
 
-A recruiting app. A hiring manager asks for strong senior backend candidates and a panel pack. The plan makes five model calls. Every prompt is built from blocks, stable ones first:
+A simulated run of a recruiting app. The prompt sizes are made up but realistic, and the numbers below are what the cache in this repo produces on them. A hiring manager asks for strong senior backend candidates and a panel pack. The plan makes five model calls. Every prompt is built from blocks, stable ones first:
 
 | Block | Tokens |
 |---|---|
@@ -236,7 +236,7 @@ The test `Recruiting_agent_run_computes_5450_of_22750_prompt_tokens` checks ever
 
 **F6. "Eviction is slow with a million nodes."** Keep the set of evictable leaves up to date on every pin, unpin, insert and evict, instead of walking the tree each time. SGLang keeps `evictable_leaves` for this.
 
-**F7. "Cached KV for one customer must not help another."** A shared cache is a timing side channel: a fast response shows a prompt was cached. A 2025 audit found cache sharing across users at seven API providers ([Gu et al., ICML 2025](https://arxiv.org/abs/2502.07776)). Fix: put a tenant id as the first key in the tree, so prefixes are only shared within one tenant.
+**F7. "Cached KV for one customer must not help another."** If customers share one cache, a fast response can hint that someone else sent the same prefix. Keep tenants separate: put a tenant id as the first key in the tree, so prefixes are only shared within one tenant.
 
 **F8. "Some prefixes are expensive to recompute but rarely used."** Plain LRU only looks at time. A cost-aware policy weighs recompute cost (prefix length) against how recently and how often it was used. The LFU Cache problem is the frequency half of this.
 
@@ -273,7 +273,6 @@ Requires .NET 10 SDK.
 - vLLM: [automatic prefix caching design](https://docs.vllm.ai/en/latest/design/prefix_caching.html)
 - NVIDIA Dynamo: [router design](https://docs.nvidia.com/dynamo/v1.1.1/design-docs/component-design/router-design); llm-d: [KV indexer](https://llm-d.ai/docs/0.7/architecture/advanced/kv-management/kv-indexer); Mooncake: [arXiv 2407.00079](https://arxiv.org/abs/2407.00079)
 - Prompt caching: [Anthropic](https://platform.claude.com/docs/en/docs/build-with-claude/prompt-caching); [OpenAI](https://developers.openai.com/api/docs/guides/prompt-caching); [Google Gemini](https://ai.google.dev/gemini-api/docs/caching); [DeepSeek](https://api-docs.deepseek.com/guides/kv_cache)
-- Cache timing risk: [Auditing Prompt Caching in Language Model APIs (ICML 2025)](https://arxiv.org/abs/2502.07776)
 - Outside AI: [Linux `fib_trie`](https://lxr.linux.no/linux+v3.2.9/Documentation/networking/fib_trie.txt); [Redis rax](https://antirez.com/news/114); [Redis eviction](https://redis.io/docs/latest/develop/reference/eviction/); [PostgreSQL buffer manager](https://www.interdb.jp/pg/pgsql08/04.html)
 
 *Details come from public papers, docs and source code as of October 2026. Implementations change; read them as "publicly described as...".*

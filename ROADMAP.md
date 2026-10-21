@@ -11,39 +11,39 @@ A living plan. Problems are built in roughly this order, and the order changes a
 
 **How the two halves connect:** each DSA problem builds a component that a system design uses. By the time a design is written, its hardest parts already exist here as tested code. The **Used in** column shows the link.
 
-> The real-world anchors below are *starting points*. Each one is checked against public sources when its problem is built, and then cited in that problem's README.
+> Real-world uses are only named in a problem's own README, after the problem is built and every claim is checked against a public source.
 
 ---
 
 ## Data structures and algorithms
 
-| Problem | Patterns | Real-world anchor | Used in | Status |
-|---|---|---|---|---|
-| [Agent plan executor](dsa/graphs/agent-plan-executor/) | Topological sort, cycle detection, DP on a DAG, bounded concurrency | PyTorch autograd, LangGraph, Durable Functions, Temporal, Airflow | Agent platform | Done |
-| [Prefix-cache radix tree](dsa/trees-and-tries/prefix-cache-radix-tree/) | Radix tree / trie, LRU, reference counting | SGLang RadixAttention, vLLM automatic prefix caching | Inference serving | Done |
-| Learning path from a pile of docs | SCC (Tarjan), condensation DAG, topological sort, ancestor/descendant queries | Microsoft GraphRAG, docs prerequisite graphs | Enterprise RAG | Planned |
-| Per-tenant token-bucket rate limiter, thread-safe | Hashing, token bucket, lock-free counters | Tokens-per-minute and requests-per-minute limits in LLM APIs | AI gateway | Planned |
-| Dynamic batcher: send at max size *or* max wait | Bounded channels, timers, back-pressure | NVIDIA Triton dynamic batching | Inference serving | Planned |
-| Top-k and top-p sampling | Heaps, partial sort, numerically stable softmax | Hugging Face `generate` | Inference serving | Planned |
-| Merge ranked results from N shards | k-way merge, reciprocal rank fusion | Hybrid search in Elasticsearch / Azure AI Search | Enterprise RAG | Planned |
-| Semantic cache | LRU + TTL, similarity threshold, kNN | GPTCache, Azure API Management semantic caching | Semantic cache at scale | Planned |
-| Session affinity with consistent hashing and bounded loads | Consistent hashing, load caps | Google's consistent hashing with bounded loads, prefix-aware routing | Inference serving | Planned |
-| Pack the context window | 0/1 knapsack DP vs greedy, token budgets | RAG context assembly | Enterprise RAG | Planned |
-| Single-flight: stop a cache stampede | Request coalescing, `TaskCompletionSource` | Go `singleflight`, CDN request collapsing | Semantic cache at scale | Planned |
-| Near-duplicate detection in training data | MinHash, locality-sensitive hashing | Deduplication in LLM pre-training corpora | Embedding pipeline | Planned |
-| Vector search: from brute force to IVF | Heaps, k-means, recall vs latency | FAISS | Embedding pipeline | Planned |
-| Fewest GPUs that meet the SLO | Binary search on the answer | Capacity planning for inference | Inference serving | Planned |
-| Continuous-batching scheduler with a KV-cache memory budget | Greedy scheduling, pre-emption | Orca, vLLM PagedAttention | Inference serving | Planned |
-| Place models on GPUs | Bin packing (first-fit decreasing), approximation bounds | Multi-model serving | Adapter serving | Planned |
-| Parse tool-call JSON while it streams | State machines, incremental parsing | Streaming function calling in LLM APIs | Agent platform | Planned |
-| Token streaming with back-pressure and cancellation | `IAsyncEnumerable`, channels, SSE | Streaming chat completions | AI gateway | Planned |
-| Circuit breaker, retries with jitter, hedged requests | Concurrency, state machines | "The Tail at Scale" (Google) | AI gateway | Planned |
-| Resolve duplicate profiles | Union-find, blocking, transitive closure | Entity resolution | Agentic recruiting | Planned |
-| Detect an agent stuck in a loop | Cycle detection on a state graph, hashing states | Agent recursion limits | Agent platform | Planned |
-| Beam search decoding | Heaps, tree search, length normalisation | Sequence decoding | Inference serving | Planned |
-| Sliding-window token usage per tenant | Ring buffer, Fenwick tree | Usage metering and billing | AI gateway | Planned |
-| Attention with a KV cache, from scratch | Matrix maths, numerical stability | Transformer inference | Inference serving | Planned |
-| Live p50/p99 latency | Two heaps, t-digest, streaming quantiles | SLO monitoring | Evaluation platform | Planned |
+| Problem | Patterns | Used in | Status |
+|---|---|---|---|
+| [Agent plan executor](dsa/graphs/agent-plan-executor/) | Topological sort, cycle detection, DP on a DAG, bounded concurrency | Agent platform | Done |
+| [Prefix-cache radix tree](dsa/trees-and-tries/prefix-cache-radix-tree/) | Radix tree / trie, LRU, reference counting | Inference serving | Done |
+| Learning path from a pile of docs | SCC (Tarjan), condensation DAG, topological sort, ancestor/descendant queries | Enterprise RAG | Planned |
+| Per-tenant token-bucket rate limiter, thread-safe | Hashing, token bucket, lock-free counters | AI gateway | Planned |
+| Dynamic batcher: send at max size *or* max wait | Bounded channels, timers, back-pressure | Inference serving | Planned |
+| Top-k and top-p sampling | Heaps, partial sort, numerically stable softmax | Inference serving | Planned |
+| Merge ranked results from N shards | k-way merge, reciprocal rank fusion | Enterprise RAG | Planned |
+| Semantic cache | LRU + TTL, similarity threshold, kNN | Semantic cache at scale | Planned |
+| Session affinity with consistent hashing and bounded loads | Consistent hashing, load caps | Inference serving | Planned |
+| Pack the context window | 0/1 knapsack DP vs greedy, token budgets | Enterprise RAG | Planned |
+| Single-flight: stop a cache stampede | Request coalescing, `TaskCompletionSource` | Semantic cache at scale | Planned |
+| Near-duplicate detection in training data | MinHash, locality-sensitive hashing | Embedding pipeline | Planned |
+| Vector search: from brute force to IVF | Heaps, k-means, recall vs latency | Embedding pipeline | Planned |
+| Fewest GPUs that meet the SLO | Binary search on the answer | Inference serving | Planned |
+| Continuous-batching scheduler with a KV-cache memory budget | Greedy scheduling, pre-emption | Inference serving | Planned |
+| Place models on GPUs | Bin packing (first-fit decreasing), approximation bounds | Adapter serving | Planned |
+| Parse tool-call JSON while it streams | State machines, incremental parsing | Agent platform | Planned |
+| Token streaming with back-pressure and cancellation | `IAsyncEnumerable`, channels, SSE | AI gateway | Planned |
+| Circuit breaker, retries with jitter, hedged requests | Concurrency, state machines | AI gateway | Planned |
+| Resolve duplicate profiles | Union-find, blocking, transitive closure | Agentic recruiting | Planned |
+| Detect an agent stuck in a loop | Cycle detection on a state graph, hashing states | Agent platform | Planned |
+| Beam search decoding | Heaps, tree search, length normalisation | Inference serving | Planned |
+| Sliding-window token usage per tenant | Ring buffer, Fenwick tree | AI gateway | Planned |
+| Attention with a KV cache, from scratch | Matrix maths, numerical stability | Inference serving | Planned |
+| Live p50/p99 latency | Two heaps, t-digest, streaming quantiles | Evaluation platform | Planned |
 
 ---
 
