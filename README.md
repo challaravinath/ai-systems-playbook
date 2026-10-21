@@ -34,6 +34,7 @@ Each problem folder also has a PDF of its README for offline reading.
 | Problem | Patterns | Real-world anchor | Status |
 |---|---|---|---|
 | [Agent plan executor](dsa/graphs/agent-plan-executor/) | Topological sort, cycle detection, DP on a DAG, bounded concurrency, cancellation | PyTorch autograd, LangGraph, Durable Functions, Temporal, Airflow, Bazel | Done, 23 tests |
+| [Prefix-cache radix tree](dsa/trees-and-tries/prefix-cache-radix-tree/) | Trie, radix tree, LRU eviction over leaves with a min-heap, reference counting | SGLang RadixAttention, vLLM prefix caching, NVIDIA Dynamo, provider prompt caching | Done, 25 tests |
 
 ### System design
 
@@ -43,7 +44,7 @@ Full designs of AI systems, from the architecture down to failure modes, evaluat
 
 ## Roadmap
 
-**Up next:** *Prefix-cache radix tree* (radix tree, LRU, reference counting); *Learning path from a pile of docs* (SCCs, condensation DAG); *Per-tenant rate limiter*.
+**Up next:** *Learning path from a pile of docs* (SCCs, condensation DAG); *Per-tenant rate limiter*; *Dynamic batcher*.
 
 The full plan, 25 problems and 12 system designs, is in **[ROADMAP.md](ROADMAP.md)**. Each DSA problem builds a component that a later design uses: the rate limiter and the retries become parts of the AI gateway, the radix tree and the batcher become parts of inference serving.
 
@@ -52,7 +53,7 @@ Problems are grouped by pattern, and each group is a folder under `dsa/`:
 | Group | Patterns | Example AI problems |
 |---|---|---|
 | Graphs and DAGs | Topological sort, SCC, union-find, shortest paths | Agent plan execution (done), document prerequisite graphs, entity resolution, tool-call loop detection |
-| Trees and tries | Trie, radix tree, segment tree, tree search | Tokenizer prefix match, prefix-cache radix tree with LRU, beam search |
+| Trees and tries | Trie, radix tree, segment tree, tree search | Prefix-cache radix tree with LRU (done), tokenizer prefix match, beam search |
 | Heaps and top-K | Heaps, k-way merge, streaming quantiles | Top-k / top-p sampling, merging shard results, p99 latency |
 | Hashing and caching | LRU/LFU with expiry, consistent hashing, Bloom, MinHash | Semantic cache, session affinity, training-data dedup |
 | Search | kNN, IVF/HNSW, binary search on the answer | Vector search, the fewest GPUs that meet an SLO |
@@ -67,6 +68,8 @@ Problems are grouped by pattern, and each group is a folder under `dsa/`:
 ## Run it
 
 Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download).
+
+Each problem folder has its own solution and tests. For example:
 
 ```bash
 cd dsa/graphs/agent-plan-executor
