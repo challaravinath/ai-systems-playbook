@@ -9,7 +9,7 @@ public class PlanTests
     [Fact]
     public void Plan_with_a_loop_is_rejected_and_the_loop_is_named()
     {
-        // The planner LLM wrote: verify → write → critic → verify. A loop must never reach the executor.
+        // The planner LLM wrote: verify, write, critic, then verify again. A loop must never reach the executor.
         var ex = Assert.Throws<PlanValidationException>(() => Plan.Build([
             new PlanNode("retrieve"),
             new PlanNode("verify", "retrieve", "critic"),
@@ -19,7 +19,7 @@ public class PlanTests
         Assert.NotNull(ex.Cycle);
         Assert.Equal(ex.Cycle![0], ex.Cycle[^1]);
         Assert.Equal(["critic", "verify", "write"], ex.Cycle.Distinct().Order(StringComparer.Ordinal));
-        // Every consecutive pair is a real edge, parent → child.
+        // Every consecutive pair is a real edge from parent to child.
         var deps = new Dictionary<string, string[]> { ["verify"] = ["retrieve", "critic"], ["write"] = ["verify"], ["critic"] = ["write"] };
         for (var i = 0; i + 1 < ex.Cycle.Count; i++) Assert.Contains(ex.Cycle[i], deps[ex.Cycle[i + 1]]);
     }
@@ -64,7 +64,7 @@ public class PlanTests
     [Fact]
     public void Critical_path_is_the_slowest_chain_not_the_longest_one()
     {
-        // parse(100) → {web_lookup(2000) | score(300) → rerank(400) → fairness(50)} → dossier(800)
+        // parse (100) feeds two branches: web_lookup (2000), and score (300) then rerank (400) then fairness (50). Both feed dossier (800).
         var plan = Plan.Build([
             N("parse", 100), N("web_lookup", 2000, "parse"), N("score", 300, "parse"),
             N("rerank", 400, "score"), N("fairness", 50, "rerank"), N("dossier", 800, "web_lookup", "fairness"),
