@@ -5,9 +5,9 @@ A living plan. Problems are built in roughly this order, and the order changes a
 **Status** is one of: Done, In progress, Planned.
 
 **Next up:**
-1. Learning path from a pile of docs
+1. Fewest GPUs that meet the SLO
 2. Per-tenant rate limiter
-3. Dynamic batcher
+3. Top-k / top-p sampling
 
 **How the two halves connect:** each DSA problem builds a component that a system design uses. By the time a design is written, its hardest parts already exist here as tested code. The **Used in** column shows the link.
 
@@ -21,7 +21,7 @@ A living plan. Problems are built in roughly this order, and the order changes a
 |---|---|---|---|
 | [Agent plan executor](dsa/graphs/agent-plan-executor/) | Topological sort, cycle detection, DP on a DAG, bounded concurrency | Agent platform | Done |
 | [Prefix-cache radix tree](dsa/trees-and-tries/prefix-cache-radix-tree/) | Radix tree / trie, LRU, reference counting | Inference serving | Done |
-| Learning path from a pile of docs | SCC (Tarjan), condensation DAG, topological sort, ancestor/descendant queries | Enterprise RAG | Planned |
+| [Learning path from a pile of docs](dsa/graphs/learning-path-from-docs/) | SCC (Tarjan, Kosaraju), condensation DAG, topological sort | Enterprise RAG | Done |
 | Per-tenant token-bucket rate limiter, thread-safe | Hashing, token bucket, lock-free counters | AI gateway | Planned |
 | Dynamic batcher: send at max size *or* max wait | Bounded channels, timers, back-pressure | Inference serving | Planned |
 | Top-k and top-p sampling | Heaps, partial sort, numerically stable softmax | Inference serving | Planned |
