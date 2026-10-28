@@ -51,6 +51,7 @@ I write one LinkedIn post a week about a problem in this repo. Each post links t
 |---|---|
 | [Agent loops vs agent plans](https://lnkd.in/p/dKuhFZhE) | [Agent plan executor](dsa/graphs/agent-plan-executor/) |
 | [Prefix caching in LLM serving](https://lnkd.in/p/dp9yJrcK) | [Prefix-cache radix tree](dsa/trees-and-tries/prefix-cache-radix-tree/) |
+| [Ordering docs that depend on each other](https://lnkd.in/p/dmkKHdxM) | [Learning path from a pile of docs](dsa/graphs/learning-path-from-docs/) |
 
 ---
 
