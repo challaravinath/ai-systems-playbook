@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/demo/">
+    <Project Path="demo/FewestGpus.Demo/FewestGpus.Demo.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/FewestGpus/FewestGpus.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FewestGpus.Tests/FewestGpus.Tests.csproj" />
+  </Folder>
+</Solution>

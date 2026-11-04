@@ -5,9 +5,9 @@ A living plan. Problems are built in roughly this order, and the order changes a
 **Status** is one of: Done, In progress, Planned.
 
 **Next up:**
-1. Fewest GPUs that meet the SLO
-2. Per-tenant rate limiter
-3. Top-k / top-p sampling
+1. Per-tenant rate limiter
+2. Top-k / top-p sampling
+3. Pack the context window
 
 **How the two halves connect:** each DSA problem builds a component that a system design uses. By the time a design is written, its hardest parts already exist here as tested code. The **Used in** column shows the link.
 
@@ -32,7 +32,7 @@ A living plan. Problems are built in roughly this order, and the order changes a
 | Single-flight: stop a cache stampede | Request coalescing, `TaskCompletionSource` | Semantic cache at scale | Planned |
 | Near-duplicate detection in training data | MinHash, locality-sensitive hashing | Embedding pipeline | Planned |
 | Vector search: from brute force to IVF | Heaps, k-means, recall vs latency | Embedding pipeline | Planned |
-| Fewest GPUs that meet the SLO | Binary search on the answer | Inference serving | Planned |
+| [Fewest GPUs that meet the SLO](dsa/search/fewest-gpus-for-slo/) | Binary search on the answer | Inference serving | Done |
 | Continuous-batching scheduler with a KV-cache memory budget | Greedy scheduling, pre-emption | Inference serving | Planned |
 | Place models on GPUs | Bin packing (first-fit decreasing), approximation bounds | Adapter serving | Planned |
 | Parse tool-call JSON while it streams | State machines, incremental parsing | Agent platform | Planned |

@@ -36,6 +36,7 @@ Each problem folder also has a PDF of its README for offline reading.
 | [Agent plan executor](dsa/graphs/agent-plan-executor/) | Topological sort, cycle detection, DP on a DAG, bounded concurrency, cancellation | PyTorch autograd, LangGraph, Durable Functions, Temporal, Airflow, Bazel | Done, 23 tests |
 | [Prefix-cache radix tree](dsa/trees-and-tries/prefix-cache-radix-tree/) | Trie, radix tree, LRU eviction over leaves with a min-heap, reference counting | SGLang RadixAttention, vLLM prefix caching, NVIDIA Dynamo, provider prompt caching | Done, 25 tests |
 | [Learning path from a pile of docs](dsa/graphs/learning-path-from-docs/) | Strongly connected components (Tarjan, Kosaraju), condensation DAG, topological sort with a stable tie-break | CMake target dependencies, LLVM SCC iterator | Done, 65 tests |
+| [Fewest GPUs that meet the SLO](dsa/search/fewest-gpus-for-slo/) | Binary search on the answer, doubling search, monotone checks | Azure LLM inference trace, Splitwise SLO, Triton Perf Analyzer `--binary-search` | Done, 52 tests |
 
 ### System design
 
@@ -57,7 +58,7 @@ I write one LinkedIn post a week about a problem in this repo. Each post links t
 
 ## Roadmap
 
-**Up next:** *Fewest GPUs that meet the SLO* (binary search on the answer); *Per-tenant rate limiter*; *Top-k / top-p sampling*.
+**Up next:** *Per-tenant rate limiter*; *Top-k / top-p sampling*; *Pack the context window*.
 
 The full plan, 25 problems and 12 system designs, is in **[ROADMAP.md](ROADMAP.md)**. Each DSA problem builds a component that a later design uses: the rate limiter and the retries become parts of the AI gateway, the radix tree and the batcher become parts of inference serving.
 
@@ -69,7 +70,7 @@ Problems are grouped by pattern, and each group is a folder under `dsa/`:
 | Trees and tries | Trie, radix tree, segment tree, tree search | Prefix-cache radix tree with LRU (done), tokenizer prefix match, beam search |
 | Heaps and top-K | Heaps, k-way merge, streaming quantiles | Top-k / top-p sampling, merging shard results, p99 latency |
 | Hashing and caching | LRU/LFU with expiry, consistent hashing, Bloom, MinHash | Semantic cache, session affinity, training-data dedup |
-| Search | kNN, IVF/HNSW, binary search on the answer | Vector search, the fewest GPUs that meet an SLO |
+| Search | kNN, IVF/HNSW, binary search on the answer | Vector search, the fewest GPUs that meet an SLO (done) |
 | DP and strings | Knapsack, edit distance, Viterbi | Packing the context window, word error rate, chunking |
 | Optimisation | Greedy, bin packing, assignment, scheduling | Placing models on GPUs, continuous batching |
 | Concurrency | Channels, semaphores, coalescing, circuit breakers | Dynamic batcher, concurrent rate limiter, single-flight cache |
