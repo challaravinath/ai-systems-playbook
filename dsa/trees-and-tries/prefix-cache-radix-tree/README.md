@@ -9,7 +9,7 @@
 
 ## 0. The problem
 
-> "Our LLM server handles thousands of requests a minute. Most prompts start the same way: the same system prompt, the same tool definitions, the same conversation so far. Before the model writes its first token it has to run prefill over every prompt token, and on long prompts that is most of the wait.
+> "Our LLM server handles thousands of requests a minute. Most prompts start the same way: the same system prompt, the same tool definitions, the same conversation so far. Without prefix caching, the model has to run prefill over every prompt token before it writes its first token, and on long prompts that can be a big part of the wait.
 > Write the component that remembers which prompt prefixes already have their KV cache computed, so a new request only pays for the part that is new. GPU memory is limited, so it has to evict. And it must never evict KV that a running request is still using."
 
 **Try it before you read on.** Hints, if you need them:
@@ -165,7 +165,7 @@ Both are correct. It mostly comes down to how the engine already manages KV memo
 |---|---|
 | `Acquire` | O(L) token comparisons for a prompt of length L, plus O(edge length) to copy an edge on a split |
 | `Insert` | O(remaining tokens), plus eviction if needed |
-| `Evict` | O(N) to collect leaves + O(k log N) to remove k of them. SGLang now keeps the evictable leaves in a set updated on every change, so it skips the walk (F6) |
+| `Evict` | O(N + (E + k) log N): N nodes visited, E unpinned leaves first put in the heap, k nodes evicted, counting the parents added when they become leaves. Worst case O(N log N). SGLang now keeps the evictable leaves in a set updated on every change, so it skips the walk (F6) |
 | `Dispose` | O(depth) |
 | Memory | one node per branch point, not per token |
 
