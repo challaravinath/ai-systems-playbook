@@ -252,7 +252,7 @@ The test `Recruiting_agent_run_computes_5450_of_22750_prompt_tokens` checks ever
 | Eviction | Evict the oldest node, wherever it is | Evicting an inner node strands every branch below it | Leaves only; a parent follows when its last child goes |
 | Eviction | Linked-list LRU over all nodes | Inner and pinned nodes sit in the list and must be skipped every time | Min-heap over unpinned leaves |
 | Pinning | A yes/no flag | The first of two parallel requests unpins the shared path while the second still uses it | A count |
-| Pinning | Split without copying the count | The new top node looks unpinned and gets evicted under a running request | `top.RefCount = child.RefCount` |
+| Pinning | Split without copying the count | The new top node's count is too low. Releases push it below its child's count, and a request that pins only the top part can lose its protection | `top.RefCount = child.RefCount` |
 | Insert | Insert from the root again | Another request may have cached the same tail meanwhile, giving duplicate branches | Continue from where `Acquire` stopped |
 | Prompts | Timestamp or request id at the top | Nothing ever matches | Stable content first, changing content last |
 
