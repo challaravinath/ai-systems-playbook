@@ -4,6 +4,7 @@
 **Tracks:** Trees (trie, radix tree) and caching (LRU, min-heap, reference counting)
 **Reading time:** about 30 minutes, longer if you try it yourself first
 **Code:** `src/PrefixCache/RadixPrefixCache.cs`. **Tests:** 26, run with `dotnet test`
+**Book:** a guided version, with a paper walkthrough, code flow and exercises, is Chapter 1 of [From Algorithms to AI Systems](https://leanpub.com/fromalgorithmstoaisystems).
 
 ---
 
