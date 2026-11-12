@@ -1,0 +1,2 @@
+# The Azure trace files are not ours. Download them; never commit them.
+*.csv

@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/demo/">
+    <Project Path="demo/TenantRateLimiter.Demo/TenantRateLimiter.Demo.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/TenantRateLimiter/TenantRateLimiter.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TenantRateLimiter.Tests/TenantRateLimiter.Tests.csproj" />
+  </Folder>
+</Solution>
