@@ -34,7 +34,7 @@ Each problem folder also has a PDF of its README for offline reading.
 | Problem | Patterns | Real-world anchor | Status |
 |---|---|---|---|
 | [Agent plan executor](dsa/graphs/agent-plan-executor/) | Topological sort, cycle detection, DP on a DAG, bounded concurrency, cancellation | PyTorch autograd, LangGraph, Durable Functions, Temporal, Airflow, Bazel | Done, 23 tests |
-| [Prefix-cache radix tree](dsa/trees-and-tries/prefix-cache-radix-tree/) | Trie, radix tree, LRU eviction over leaves with a min-heap, reference counting | SGLang RadixAttention, vLLM prefix caching, NVIDIA Dynamo, provider prompt caching | Done, 25 tests |
+| [Prefix-cache radix tree](dsa/trees-and-tries/prefix-cache-radix-tree/) | Trie, radix tree, LRU eviction over leaves with a min-heap, reference counting | SGLang RadixAttention, vLLM prefix caching, NVIDIA Dynamo, provider prompt caching | Done, 26 tests |
 | [Learning path from a pile of docs](dsa/graphs/learning-path-from-docs/) | Strongly connected components (Tarjan, Kosaraju), condensation DAG, topological sort with a stable tie-break | CMake target dependencies, LLVM SCC iterator | Done, 65 tests |
 | [Fewest GPUs that meet the SLO](dsa/search/fewest-gpus-for-slo/) | Binary search on the answer, doubling search, monotone checks | Azure LLM inference trace, Splitwise SLO, Triton Perf Analyzer `--binary-search` | Done, 52 tests |
 | [Per-tenant rate limiter](dsa/concurrency/per-tenant-rate-limiter/) | Token bucket with lazy refill, a hash map of buckets per customer, a lock per customer | Claude API rate limits, Azure OpenAI quotas, .NET `TokenBucketRateLimiter`, Azure LLM inference trace | Done, 24 tests |
