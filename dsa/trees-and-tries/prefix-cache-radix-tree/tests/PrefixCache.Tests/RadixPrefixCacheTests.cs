@@ -259,6 +259,23 @@ public class Requests
     }
 
     [Fact]
+    public void Insert_after_another_request_cached_the_same_tail_makes_it_recent()
+    {
+        // The late Insert walks into [1 2 3] and touches it, on purpose (SGLang's insert does the same).
+        var cache = new RadixPrefixCache(7);
+        var first = cache.Acquire(T.Seq(1, 2, 3));
+        var second = cache.Acquire(T.Seq(1, 2, 3));
+        cache.Insert(first);
+        first.Dispose();
+        T.Serve(cache, T.Seq(7, 8));                // [7 8] is now newer than [1 2 3]
+        cache.Insert(second);                       // ...until this touches [1 2 3] again
+        second.Dispose();
+        T.Serve(cache, T.Seq(4, 5, 6));             // needs 3, room 2: evicts the oldest leaf
+        Assert.Equal(3, T.Serve(cache, T.Seq(1, 2, 3)));
+        Assert.Equal(0, T.Serve(cache, T.Seq(7, 8)));
+    }
+
+    [Fact]
     public void Insert_with_a_finished_lease_throws()
     {
         var cache = new RadixPrefixCache(10);

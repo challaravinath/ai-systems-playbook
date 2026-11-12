@@ -3,7 +3,7 @@
 
 **Tracks:** Trees (trie, radix tree) and caching (LRU, min-heap, reference counting)
 **Reading time:** about 30 minutes, longer if you try it yourself first
-**Code:** `src/PrefixCache/RadixPrefixCache.cs`. **Tests:** 25, run with `dotnet test`
+**Code:** `src/PrefixCache/RadixPrefixCache.cs`. **Tests:** 26, run with `dotnet test`
 
 ---
 
@@ -217,6 +217,7 @@ The test `Recruiting_agent_run_computes_5450_of_22750_prompt_tokens` checks ever
 | `A_split_keeps_the_pin_on_both_halves` | split copies the count |
 | `All_pins_are_gone_after_every_request_finishes` | invariant 5 |
 | `Insert_after_another_request_cached_the_same_tail_adds_nothing` | no duplicate branches |
+| `Insert_after_another_request_cached_the_same_tail_makes_it_recent` | a late `Insert` touches the tail it walks into, so LRU sees it as used |
 | `Recruiting_agent_run_computes_5450_of_22750_prompt_tokens` | the worked run in section 7 |
 | `Chat_traffic_skips_most_of_the_prefill` | 50 users, 5 turns each: over 95% of prompt tokens reused, system prompt stored once |
 
@@ -261,7 +262,7 @@ The test `Recruiting_agent_run_computes_5450_of_22750_prompt_tokens` checks ever
 
 ```bash
 cd dsa/trees-and-tries/prefix-cache-radix-tree
-dotnet test          # 25 tests: Matching (8), Eviction (5), Pinning (6), Requests (6)
+dotnet test          # 26 tests: Matching (8), Eviction (5), Pinning (6), Requests (7)
 ```
 
 Requires .NET 10 SDK.
