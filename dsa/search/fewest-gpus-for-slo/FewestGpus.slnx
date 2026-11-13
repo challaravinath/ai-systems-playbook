@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/demo/">
     <Project Path="demo/FewestGpus.Demo/FewestGpus.Demo.csproj" />
+    <Project Path="demo/FewestGpus.Experiments/FewestGpus.Experiments.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/FewestGpus/FewestGpus.csproj" />

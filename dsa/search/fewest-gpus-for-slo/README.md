@@ -2,7 +2,7 @@
 ### Binary search on the answer, run on a real production trace
 
 **Tracks:** Search (binary search on the answer, doubling search, monotone checks)
-**Code:** `src/FewestGpus/`. **Tests:** 52, run with `dotnet test`. **Demo:** `demo/`, on the Azure LLM inference trace
+**Code:** `src/FewestGpus/`. **Tests:** 73, run with `dotnet test`. **Demos:** `demo/FewestGpus.Demo` (the search) and `demo/FewestGpus.Experiments` (what-if runs), on the Azure LLM inference trace
 
 ---
 
@@ -10,7 +10,9 @@
 
 > An LLM endpoint has a latency target on p99 time to first token. Every machine costs money. What is the fewest machines that still meets the target for this traffic?
 
-You can't answer it by dividing traffic by one machine's capacity, because requests queue behind each other. The only way to know if n machines is enough is to run a check (a load test or a simulation). Checks are expensive, so the goal is to run as few as possible.
+You can't answer it by dividing traffic by one machine's capacity, because requests queue behind each other.
+
+What the simulator here sizes: the machines that do the prompt work (prefill) up to the first token. It has no decode, so a machine is free again after the first token, like the prompt pool in Splitwise. Its one queue sends each request to the first free machine, a perfect router, so its answer is a lower bound for a real fleet. The only way to know if n machines is enough is to run a check (a load test or a simulation). Checks are expensive, so the goal is to run as few as possible.
 
 <details><summary>Hint 1</summary>If 12 machines meet the target, what do you know about 13?</details>
 <details><summary>Hint 2</summary>Write the result for n = 1, 2, 3 ... as a row of N and Y. What shape is it?</details>
@@ -55,14 +57,16 @@ Binary search is only as good as its upper bound. Without a tight one you need a
 
 ## 4. Why it's correct
 
-**The search.** At every step, everything below `lo` is known N, everything above `hi` is known Y, and `best` is the smallest Y seen. The range halves each step, so it ends. At the end, `best` was checked and passed, and `best - 1` was checked and failed (unless `best` is the start). A test checks both are in the log.
+**The search.** At every step, everything below `lo` is known N, and `best` is either nothing yet or `hi + 1`, checked and passed. The range halves each step, so it ends. At the end, `best` was checked and passed, and `best - 1` was checked and failed (unless `best` is the start). A test checks both are in the log.
 
 **The check must be monotone,** or binary search returns a wrong number and nothing looks broken. For the simulator here (one first-come, first-served queue, each request to the first free machine), adding a machine never makes any request later:
 1. Treat n machines as n + 1 where one is never free. Sort each side's "free at" times.
 2. At the start, the side with the real extra machine is no later in every position.
-3. Each request takes the earliest free time on each side, so it starts no later, and the slot it fills is no later. Sorting keeps the order position by position.
+3. Each request takes the earliest free time on each side, so it starts no later, and the slot it fills is no later. Sorting keeps the order position by position: if x <= y entry by entry, then sorted(x) <= sorted(y) entry by entry.
 
 So every request's TTFT is no larger, and so is any percentile of it. Tests check this request by request on random traces.
+
+This holds for this simulator. A real load test is noisy and routes differently, so its row can come out N Y N Y near the answer. Section 5 shows what that does to the search.
 
 ---
 
@@ -72,7 +76,7 @@ So every request's TTFT is no larger, and so is any percentile of it. Tests chec
 
 | Input | Value | Source |
 |---|---|---|
-| Traffic | Two one-hour traces from Azure LLM inference services, coding (8,819 requests) and conversation (19,366), replayed as recorded | [Azure LLM Inference Dataset 2023](https://github.com/Azure/AzurePublicDataset/blob/master/AzureLLMInferenceDataset2023.md), CC-BY |
+| Traffic | Two traces of about an hour from Azure LLM inference services, coding (8,819 requests) and conversation (19,366), replayed as recorded | [Azure LLM Inference Dataset 2023](https://github.com/Azure/AzurePublicDataset/blob/master/AzureLLMInferenceDataset2023.md), CC-BY |
 | Target | p99 of (TTFT / the same request's TTFT on an idle DGX-A100) at most 6, for A100 and H100 alike | Splitwise, Table VI ([Patel et al., ISCA 2024](https://arxiv.org/abs/2311.18677)) |
 | One machine | Llama-70B on one DGX machine, 8 GPUs | Splitwise |
 | Idle TTFT | A straight line in prompt tokens, through Splitwise's Table IV medians (see below) | **Our fit** |
@@ -82,7 +86,7 @@ So every request's TTFT is no larger, and so is any percentile of it. Tests chec
 - A100: (185 - 155) / (1469 - 1020) = 0.0668 ms per token, plus 155 - 1020 x 0.0668 = 86.8 ms fixed
 - H100: (95 - 84) / 449 = 0.0245 ms per token, plus 59.0 ms fixed
 
-Two points always fit a line exactly, so this is an estimate, not a validated model.
+Two points always fit a line exactly, so this is an estimate, not a validated model. Section 5 shows how much a line 25% off would change the answer.
 
 **Results** (from `demo/`, reproduce with section 8):
 
@@ -93,10 +97,31 @@ Two points always fit a line exactly, so this is an estimate, not a validated mo
 | Conversation | A100 | 2 | 16 | 2 | 14 | 2 |
 | Conversation | H100 | 1 | 8 | 1 | 14 | 1 |
 
-Two things the real trace shows:
-- **Size for the bursts, not the average.** Spread evenly, the coding traffic would keep 0.57 A100 machines busy. It needs 11, because it comes in bursts: 67 requests in its busiest second (18:31:26), against an average of 2.57 a second.
+What the real trace shows:
+- **Size for the bursts, not the average.** Spread evenly, the coding traffic would keep 0.57 A100 machines busy. It needs 11, because it comes in bursts. Its busiest clock second had 67 requests (18:31:26), against an average of 2.57 a second, but one second can't decide a p99 that lets 88 requests be slow. The 10-second bursts do: the work arriving in the busiest 10 seconds needs about 9.4 machines just to keep up.
 - **A safe upper bound can make binary search worse than trying every n.** With the number of requests as the bound, binary search took 13 to 14 checks, more than trying 1, 2, 3 in every row.
 - **Doubling isn't free either.** For small answers, trying in order is hard to beat (coding on H100: 5 checks in order, 6 doubling). It pays off as the answer grows (coding on A100: 8 against 11).
+
+**What-if runs** (from `demo/FewestGpus.Experiments`, coding trace, A100 unless noted):
+
+| Question | Result |
+|---|---|
+| The same prompts arriving smoothly (Poisson, same rate, 20 seeds) | 2 machines instead of 11 (H100: 1 instead of 5). The bursts cost 9 machines |
+| Work in the busiest window, as machines | 1 s: 15.8, 10 s: 9.4, 60 s: 2.5. The 10-second window is the useful estimate |
+| Without the busiest 60 seconds (723 requests) | Still 11. The 10-second bursts are spread over the hour |
+| Every 5-minute window must meet the target | 12 (H100: 6). At 11, the worst 5 minutes have p99 7.7x |
+| A noisy check (each prefill times a lognormal factor, sigma 0.3), 1,000 searches | 15.1% answer 10, too few. Majority of 3 per check: 6.6%, at 24 load tests instead of 8. With sigma 0.1, always 11 |
+| The idle line 25% off in slope and fixed part | 9 to 13 |
+
+Target and percentile matter more than anything else:
+
+| Target | p90 | p95 | p99 | p99.9 |
+|---|---|---|---|---|
+| 2x | 7 | 9 | 13 | 16 |
+| 3x | 6 | 8 | 12 | 13 |
+| 4x | 6 | 7 | 12 | 13 |
+| 6x | 5 | 7 | 11 | 12 |
+| 10x | 5 | 6 | 9 | 11 |
 
 ---
 
@@ -104,7 +129,7 @@ Two things the real trace shows:
 
 | | Status |
 |---|---|
-| Search finds the fewest n; check counts in section 3 | **Tested** (52 tests, incl. thousands of random cases against trying every n) |
+| Search finds the fewest n; check counts in section 3 | **Tested** (73 tests, incl. thousands of random cases against trying every n) |
 | Simulator is monotone | **Tested** on random traces, argued in section 4 |
 | Traffic, target, machine size | **Cited** (section 5) |
 | Idle TTFT per request | **Our fit** to two published medians |
@@ -112,6 +137,8 @@ Two things the real trace shows:
 | Batching | **Left out.** A machine does one first token at a time; real servers batch, and batching changes prefill time |
 | Network time, decode | **Left out.** Only queueing plus prefill |
 | Fleet size | **Not claimed.** The traces are samples of two services; the answers are for this model of these samples |
+| What is sized | **The prompt pool, as a lower bound.** No decode, and a perfect router |
+| A real load test as the check | **Noisy and maybe not monotone.** Re-check the answer and the one below it, or take a majority of several runs (section 5) |
 
 The part that carries over unchanged is the search: plug in a real load test as the check, and it makes the same calls.
 
@@ -125,7 +152,9 @@ The part that carries over unchanged is the search: plug in a real load test as 
 | Doubling | its path; cost depends on the answer, not the bound; never above the limit; "no answer" when nothing passes |
 | Simulator | small cases you can do on paper; waiting; ties; nearest-rank percentile; monotone per request; more machines than requests changes nothing |
 | Slowdown target | TTFT over idle TTFT; a short prompt stuck behind a long one; only N to Y as machines are added |
-| Trace and line | CSV parsing and bad rows; arrivals relative to the first request; busiest second; the line gives back Splitwise's four medians |
+| Trace and line | CSV parsing and bad rows; arrivals relative to the first request; busiest second and its tie-break; the line passes through Splitwise's four medians (by construction, not as validation) |
+| Guards | every input check, each proven by a test that fails when the check is removed; doubling near `int.MaxValue`; cancellation while doubling; exact percentile ranks |
+| What-if | Poisson keeps prompts and rate; peak work per window; a noisy check with no noise matches the plain one; majority of 3; a bad minute fails the window check but hides in the hourly one; the window check is monotone |
 
 ---
 
@@ -137,7 +166,10 @@ The trace files aren't in this repo. Download `AzureLLMInferenceTrace_code.csv` 
 cd dsa/search/fewest-gpus-for-slo
 dotnet test
 dotnet run --project demo/FewestGpus.Demo -- --trace <path>/AzureLLMInferenceTrace_code.csv --gpu A100
+dotnet run --project demo/FewestGpus.Experiments -- --trace <path>/AzureLLMInferenceTrace_code.csv
 ```
+
+The what-if run takes about 3 minutes; most of it is the 4,000 noisy searches.
 
 Requires .NET 10 SDK.
 
@@ -152,6 +184,8 @@ Requires .NET 10 SDK.
 | A safe but huge upper bound | More checks than trying every n (section 5) |
 | Sizing on average traffic | Bursts break the target |
 | Returning the top of the range when nothing passes | Claims n works when it doesn't |
+| Trusting one run of a noisy load test near the answer | The search can settle on one machine too few |
+| A p99 over the whole hour | A bad five minutes hides inside it |
 
 ---
 
