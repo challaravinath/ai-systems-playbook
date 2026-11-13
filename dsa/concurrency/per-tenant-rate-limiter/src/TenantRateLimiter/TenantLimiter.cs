@@ -97,6 +97,9 @@ public sealed class TenantLimiter
         }
     }
 
+    // For a real server: the same clock as TryAcquire(tenant, inputTokens).
+    public int RemoveIdle() => RemoveIdle(_clock.GetElapsedTime(_started));
+
     // A full bucket is the same as a new one, so a customer whose buckets have both refilled
     // can be dropped without changing any future answer. That keeps the map from growing forever.
     public int RemoveIdle(TimeSpan now)
@@ -107,6 +110,12 @@ public sealed class TenantLimiter
         {
             lock (t.Gate)
             {
+                // Another RemoveIdle running at the same time already dropped it.
+                if (t.Removed)
+                {
+                    continue;
+                }
+
                 t.Requests.RefillTo(seconds);
                 t.InputTokens.RefillTo(seconds);
                 if (t.Requests.IsFull && t.InputTokens.IsFull)
@@ -123,6 +132,13 @@ public sealed class TenantLimiter
     private Tenant NewTenant(string id, double nowSeconds)
     {
         var limits = _limitsFor(id) ?? throw new InvalidOperationException($"no limits for '{id}'");
+
+        // A bucket that can't hold one request would turn every request away as too big.
+        if (limits.RequestCapacity < 1)
+        {
+            throw new InvalidOperationException(
+                $"'{id}': a burst of {limits.Burst.TotalSeconds} s holds {limits.RequestCapacity:0.##} requests, less than 1");
+        }
         return new Tenant(
             new TokenBucket(limits.RequestCapacity, limits.RequestsPerMinute / 60, nowSeconds),
             new TokenBucket(limits.InputTokenCapacity, limits.InputTokensPerMinute / 60, nowSeconds));

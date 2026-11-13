@@ -2,7 +2,8 @@
 ### Token buckets in a hash map, run on a real production trace
 
 **Tracks:** Concurrency and hashing (token bucket, lazy refill, a lock per key)
-**Code:** `src/TenantRateLimiter/`. **Tests:** 24, run with `dotnet test`. **Demo:** `demo/`, on the Azure LLM inference trace
+**Code:** `src/TenantRateLimiter/`. **Tests:** 26, run with `dotnet test`. **Demo:** `demo/`, on the Azure LLM inference trace
+**Book:** a guided version, with a paper walkthrough, code flow and exercises, is Chapter 2 of [From Algorithms to AI Systems](https://leanpub.com/fromalgorithmstoaisystems).
 
 ---
 
@@ -74,7 +75,7 @@ These are the standard definitions; only the token bucket and the fixed window a
 
 **Time never runs backwards.** A thread can read the clock and then get the lock after a thread that read it later. The bucket ignores the older time instead of moving its clock back.
 
-**Removing idle customers is safe.** A full bucket gives the same answers as a new one. So once both of a customer's buckets are full again, the entry can be deleted. If a request found the entry just before it was deleted, it sees the deleted flag and fetches the new one. A test runs cleanup and requests together and never sees extra requests get through.
+**Removing idle customers is safe.** A full bucket gives the same answers as a new one. So once both of a customer's buckets are full again, the entry can be deleted. If a request found the entry just before it was deleted, it sees the deleted flag and fetches the new one. A test runs 500 rounds, each a minute apart so the bucket is full again, with cleanup running while that round's requests arrive. Exactly the bucket's 50 get through in every round. Without the flag, 54 to 60 got through in our runs.
 
 ---
 
@@ -120,7 +121,7 @@ What the real trace shows:
 
 | | Status |
 |---|---|
-| Bucket maths, both or neither, one lock per customer, cleanup | **Tested** (24 tests, incl. 300 random traces against a step-by-step bucket, and thread races) |
+| Bucket maths, both or neither, one lock per customer, cleanup | **Tested** (26 tests, incl. 300 random traces against a step-by-step bucket, and thread races) |
 | Same answers as .NET's `TokenBucketRateLimiter` | **Tested** for bursts at one instant and for requests bigger than the bucket. In our check, its manual refill (`TryReplenish`) added nothing until real time had passed, so it can't be stepped through time in a test |
 | Token bucket, per organization, requests and input tokens per minute | **Cited** (section 1) |
 | Two customers, the limits, the bucket sizes, no retries | **Our choices** (section 5) |
@@ -137,8 +138,8 @@ What the real trace shows:
 | Bucket | the section 2 table step by step; a bigger cost waits for the difference; a cost above capacity never fits; an older time is ignored; bad settings |
 | Against a step-by-step bucket | 300 random traces, exact agreement on every decision and every token count |
 | Against .NET | a burst of mixed costs at one instant; a cost above capacity is refused up front |
-| Per customer | one customer's burst doesn't touch another; both or neither; Retry-After is the longer of the two waits; too big takes nothing; a shorter bucket |
-| Threads | 20,000 requests at one instant, exactly 1,000 through; cleanup running during requests lets nothing extra through |
+| Per customer | one customer's burst doesn't touch another; both or neither; Retry-After is the longer of the two waits; too big takes nothing; a shorter bucket; a burst too short to hold one request is refused |
+| Threads | 20,000 requests at one instant, exactly 1,000 through; cleanup running during requests lets nothing extra through; `RemoveIdle()` reads the same clock as `TryAcquire` |
 | Fixed window | 10 through around the reset against 5 for the token bucket |
 | Trace | CSV parsing and bad rows; per-minute averages; busiest window; replay per customer; the same answers alone or next to a noisy customer |
 
@@ -169,6 +170,7 @@ Requires .NET 10 SDK.
 | `DateTime.Now` as the clock | It can jump; use a monotonic clock |
 | Making a too-big request wait | It never fits; reject it straight away |
 | Never removing customers | The map grows forever |
+| A burst too short to hold one request | Every request is too big, forever; refuse the setting |
 
 ---
 

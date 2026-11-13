@@ -106,29 +106,69 @@ public class TenantLimiterTests
     [Fact]
     public async Task Removing_idle_customers_while_requests_arrive_never_lets_extra_through()
     {
-        var limiter = Limiter(500, 1_000_000);
-        int allowed = 0;
-        using var done = new CancellationTokenSource();
+        // 50 a minute. Each round is a minute after the last, so the bucket is full again when
+        // the round starts, and cleanup can remove the customer while that round's requests arrive.
+        var limiter = Limiter(50, 1_000_000);
 
-        var cleaner = Task.Run(() =>
+        for (int round = 1; round <= 500; round++)
         {
-            while (!done.IsCancellationRequested)
-            {
-                limiter.RemoveIdle(S(1));
-            }
-        });
+            var now = S(60 * round);
+            int allowed = 0;
+            using var done = new CancellationTokenSource();
 
-        Parallel.For(0, 10_000, _ =>
-        {
-            if (limiter.TryAcquire("a", 1, S(1)).Allowed)
+            var cleaner = Task.Run(() =>
             {
-                Interlocked.Increment(ref allowed);
-            }
-        });
-        done.Cancel();
-        await cleaner;
+                while (!done.IsCancellationRequested)
+                {
+                    limiter.RemoveIdle(now);
+                }
+            });
 
-        Assert.Equal(500, allowed);
+            Parallel.For(0, 120, _ =>
+            {
+                if (limiter.TryAcquire("a", 1, now).Allowed)
+                {
+                    Interlocked.Increment(ref allowed);
+                }
+            });
+            done.Cancel();
+            await cleaner;
+
+            Assert.Equal(50, allowed);
+        }
+    }
+
+    [Fact]
+    public void A_burst_too_short_to_hold_one_request_is_refused()
+    {
+        // 5 a minute with a 10-second burst would hold 0.83 requests, so every request would be too big.
+        var limiter = new TenantLimiter(_ => new TenantLimits(5, 1_000_000, S(10)));
+
+        Assert.Throws<InvalidOperationException>(() => limiter.TryAcquire("a", 1, S(0)));
+    }
+
+    // A clock the test moves by hand.
+    private sealed class ManualClock : TimeProvider
+    {
+        public long Ticks { get; set; }
+
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+
+        public override long GetTimestamp() => Ticks;
+    }
+
+    [Fact]
+    public void RemoveIdle_without_a_time_uses_the_same_clock_as_TryAcquire()
+    {
+        var clock = new ManualClock();
+        var limiter = new TenantLimiter(_ => new TenantLimits(60, 600), clock);
+        Assert.True(limiter.TryAcquire("a", 600).Allowed);              // tokens bucket now empty
+
+        clock.Ticks += TimeSpan.FromSeconds(30).Ticks;
+        Assert.Equal(0, limiter.RemoveIdle());                           // half refilled, so it stays
+
+        clock.Ticks += TimeSpan.FromSeconds(30).Ticks;
+        Assert.Equal(1, limiter.RemoveIdle());                           // full again after 60 s
     }
 
     [Fact]
