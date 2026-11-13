@@ -94,4 +94,67 @@ public class TraceReplayTests
         Assert.Equal(alone[0].Outcomes, together[1].Outcomes);
         Assert.True(together[0].Limited > 0);
     }
+
+    [Fact]
+    public void One_shared_bucket_lets_a_noisy_customer_use_up_a_quiet_ones_allowance()
+    {
+        // noisy: 20 small requests at 1 s. quiet: one request at 0 s, 1 s and 2 s.
+        var noisy = Rows(string.Concat(Enumerable.Repeat("2023-11-16 18:00:01.0000000,100,1\n", 20)));
+        var quiet = Rows(
+            "2023-11-16 18:00:00.0000000,100,1\n" +
+            "2023-11-16 18:00:01.0000000,100,1\n" +
+            "2023-11-16 18:00:02.0000000,100,1\n");
+        Customer[] customers = [new("noisy", noisy), new("quiet", quiet)];
+
+        // Separate: 3 requests a minute each. Shared: one bucket with both limits added, 6 a minute.
+        var separate = TraceReplay.Run(customers, _ => new TenantLimits(3, 1_000_000));
+        var shared = TraceReplay.Run(customers, _ => new TenantLimits(6, 2_000_000), _ => "shared");
+
+        Assert.Equal(0, separate[1].Limited);
+        // quiet's 0 s request takes 1 of the 6. noisy takes the other 5 at 1 s, so quiet's later two get 429s.
+        Assert.Equal([Outcome.Allowed, Outcome.Limited, Outcome.Limited], shared[1].Outcomes);
+    }
+
+    [Fact]
+    public void A_retry_at_retry_after_passes_and_records_the_added_delay()
+    {
+        // 2 a minute: a bucket of 2 that gets 1 back every 30 s. Three requests at 0 s.
+        var rows = Rows(string.Concat(Enumerable.Repeat("2023-11-16 18:00:00.0000000,100,1\n", 3)));
+        var policy = new RetryPolicy(MaxAttempts: 3, RoundUpToWholeSeconds: false, MaxJitter: TimeSpan.Zero);
+
+        var r = TraceReplay.RunWithRetries([new Customer("a", rows)], _ => new TenantLimits(2, 1_000_000), policy, seed: 1)[0];
+
+        Assert.Equal((2, 1, 0, 4), (r.FirstTry, r.AfterRetry, r.GaveUp, r.Attempts));
+        Assert.Equal([TimeSpan.FromSeconds(30)], r.AddedDelays);
+    }
+
+    [Fact]
+    public void Rounding_retry_after_up_to_whole_seconds_waits_longer()
+    {
+        // 60 a minute with a 2-second burst: a bucket of 2 that gets 1 back every second.
+        // Two requests at 0 s empty it. At 0.3 s the bucket holds 0.3, so Retry-After is 0.7 s.
+        var rows = Rows(
+            "2023-11-16 18:00:00.0000000,1,1\n" +
+            "2023-11-16 18:00:00.0000000,1,1\n" +
+            "2023-11-16 18:00:00.3000000,1,1\n");
+        Func<string, TenantLimits> limits = _ => new TenantLimits(60, 1_000_000, TimeSpan.FromSeconds(2));
+
+        var exact = TraceReplay.RunWithRetries([new Customer("a", rows)], limits, new RetryPolicy(3, false, TimeSpan.Zero), 1)[0];
+        var rounded = TraceReplay.RunWithRetries([new Customer("a", rows)], limits, new RetryPolicy(3, true, TimeSpan.Zero), 1)[0];
+
+        Assert.Equal(0.7, exact.AddedDelays.Single().TotalSeconds, 6);
+        Assert.Equal(1.0, rounded.AddedDelays.Single().TotalSeconds, 6);
+    }
+
+    [Fact]
+    public void A_client_gives_up_after_max_attempts()
+    {
+        // A bucket of 1 that refills over a minute, five requests at once, and only one try each.
+        var rows = Rows(string.Concat(Enumerable.Repeat("2023-11-16 18:00:00.0000000,1,1\n", 5)));
+
+        var r = TraceReplay.RunWithRetries(
+            [new Customer("a", rows)], _ => new TenantLimits(1, 1_000_000), new RetryPolicy(1, true, TimeSpan.Zero), 1)[0];
+
+        Assert.Equal((1, 0, 4, 5), (r.FirstTry, r.AfterRetry, r.GaveUp, r.Attempts));
+    }
 }

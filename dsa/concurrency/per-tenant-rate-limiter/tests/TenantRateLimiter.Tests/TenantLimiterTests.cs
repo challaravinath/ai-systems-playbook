@@ -172,6 +172,30 @@ public class TenantLimiterTests
     }
 
     [Fact]
+    public void A_retry_at_retry_after_is_not_refused_forever()
+    {
+        // Uneven limits, so the bucket is often short by a rounding error rather than a whole token.
+        var random = new Random(7);
+        var limiter = Limiter(308.0, 630_742.0);
+        var now = TimeSpan.Zero;
+
+        for (int i = 0; i < 20_000; i++)
+        {
+            now += TimeSpan.FromTicks(random.Next(0, 2_000_000));
+            int cost = random.Next(1, 8_000);
+            var d = limiter.TryAcquire("a", cost, now);
+            int retries = 0;
+            while (d.Outcome == Outcome.Limited)
+            {
+                Assert.True(d.RetryAfter > TimeSpan.Zero, $"request {i}: limited with a Retry-After of 0");
+                now += d.RetryAfter;
+                d = limiter.TryAcquire("a", cost, now);
+                Assert.True(++retries <= 3, $"request {i}: still limited after {retries} retries at Retry-After");
+            }
+        }
+    }
+
+    [Fact]
     public void Bad_input_is_rejected()
     {
         var limiter = Limiter(60, 600);

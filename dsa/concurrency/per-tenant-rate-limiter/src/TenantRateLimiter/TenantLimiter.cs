@@ -92,7 +92,7 @@ public sealed class TenantLimiter
 
                 // Wait for whichever bucket needs longer.
                 double wait = Math.Max(t.Requests.SecondsUntil(1), t.InputTokens.SecondsUntil(inputTokens));
-                return new Decision(Outcome.Limited, TimeSpan.FromSeconds(wait));
+                return new Decision(Outcome.Limited, RoundUpToTick(wait));
             }
         }
     }
@@ -128,6 +128,12 @@ public sealed class TenantLimiter
         }
         return removed;
     }
+
+    // Round the wait up to whole ticks (100 ns), and to at least one. A bucket can be short by a
+    // rounding error, and TimeSpan.FromSeconds would turn that tiny wait into 0. A client told to
+    // wait 0 comes straight back and is refused again, every time.
+    private static TimeSpan RoundUpToTick(double seconds) =>
+        TimeSpan.FromTicks(Math.Max(1, (long)Math.Ceiling(seconds * TimeSpan.TicksPerSecond)));
 
     private Tenant NewTenant(string id, double nowSeconds)
     {
