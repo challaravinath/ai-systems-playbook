@@ -135,4 +135,81 @@ public class ExperimentTests
             }
         }
     }
+
+    [Fact]
+    public void A_block_bootstrap_keeps_whole_blocks_and_the_length()
+    {
+        // Three 1-second blocks: 1 request, 2 requests, 3 requests.
+        Request[] trace = [new(0, 10), new(1000, 20), new(1500, 20), new(2000, 30), new(2100, 30), new(2200, 30)];
+
+        var sample = Arrivals.BlockBootstrap(trace, 1000, seed: 4);
+
+        Assert.All(sample, r => Assert.InRange(r.ArrivalMs, 0, 2999));
+        // Every block that appears comes whole: its requests all share one prefill size here.
+        foreach (var block in sample.GroupBy(r => Math.Floor(r.ArrivalMs / 1000)))
+        {
+            double size = block.First().PrefillMs;
+            Assert.Equal((int)(size / 10), block.Count());
+        }
+        Assert.Equal(sample, Arrivals.BlockBootstrap(trace, 1000, seed: 4));
+    }
+
+    [Fact]
+    public void Busiest_window_count_slides()
+    {
+        // 0.6 s and 1.4 s are in different clock seconds but only 0.8 s apart.
+        Request[] trace = [new(600, 1), new(1400, 1), new(3000, 1)];
+
+        Assert.Equal(2, Arrivals.BusiestWindowCount(trace, 1000));
+        Assert.Equal(1, Arrivals.BusiestWindowCount(trace, 500));
+    }
+
+    [Fact]
+    public async Task Run_level_noise_moves_the_whole_run_together()
+    {
+        // With only run-level noise, every request in one run gets the same factor,
+        // so a burst of equal requests keeps equal slowdowns within a run.
+        Request[] trace = [new(0, 100), new(0, 100)];
+        double[] baseline = [100, 100];
+        var noisy = Checks.NoisySlowdownTarget(trace, baseline, 100, 1.5, sigma: 0, new Random(2), runSigma: 0.3);
+
+        var answers = new List<bool>();
+        for (int i = 0; i < 60; i++)
+        {
+            answers.Add(await noisy(2, CancellationToken.None));
+        }
+
+        Assert.Contains(true, answers);
+        Assert.Contains(false, answers);
+    }
+
+    [Fact]
+    public async Task Confirming_the_boundary_moves_a_lucky_answer_back_up()
+    {
+        // The true answer is 11, but the search reported 10 after one lucky pass.
+        // Re-checked as a majority, 10 fails, so the answer moves up to 11 and stays there.
+        var script = new Dictionary<int, Queue<bool>>
+        {
+            [10] = new([false, true, false, false, false, true]),   // checked twice: as the answer, then as the one below 11
+            [11] = new([true, true, true]),
+            
+        };
+        var check = (Func<int, CancellationToken, ValueTask<bool>>)((n, _) => ValueTask.FromResult(script[n].Dequeue()));
+
+        Assert.Equal(11, await Checks.ConfirmBoundaryAsync(10, 3, check, 100));
+    }
+
+    [Fact]
+    public void A_failing_test_is_decided_at_the_miss_that_tips_it_over()
+    {
+        // Five requests at once, 100 ms each, on 1 machine: first tokens at 100 to 500 ms,
+        // slowdowns 1 to 5. Target p80 at most 2 allows one miss. Misses at 300, 400 and 500 ms,
+        // so the second miss, at 400 ms, decides it.
+        Request[] trace = Enumerable.Range(0, 5).Select(_ => new Request(0, 100)).ToArray();
+        double[] baseline = Enumerable.Repeat(100.0, 5).ToArray();
+
+        Assert.Equal(400, Checks.MsUntilDecided(trace, baseline, 1, 80, 2), 9);
+        // With 5 machines it passes, and a pass is only known at the end.
+        Assert.Equal(100, Checks.MsUntilDecided(trace, baseline, 5, 80, 2), 9);
+    }
 }

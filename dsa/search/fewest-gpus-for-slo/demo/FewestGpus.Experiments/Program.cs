@@ -153,6 +153,91 @@ foreach (var gpu in gpus)
     double worstAtHourly = Checks.WorstWindowSlowdown(trace, baseline, hourly!.Value, P99, 300_000);
     Console.WriteLine($"   {gpu.Name}  whole trace {hourly}, every 5 minutes {five}, every minute {one}; at {hourly} machines the worst 5-minute p99 is {worstAtHourly:0.0}x");
 }
+// 6. The bursts, counted, and what the answer costs.
+Console.WriteLine();
+Console.WriteLine("6. Bursts and cost, A100");
+{
+    var trace = AzureTrace.ToRequests(rows, PrefillModel.SplitwiseA100);
+    var clock = AzureTrace.BusiestSecond(rows);
+    double spanS = trace.Max(r => r.ArrivalMs) / 1000;
+    double avg = trace.Sum(r => r.PrefillMs) / 1000 / spanS;
+    Console.WriteLine($"   average {rows.Count / spanS:0.00} requests a second; busiest clock second {clock.Requests}; busiest sliding 1 s {Arrivals.BusiestWindowCount(trace, 1000)}, 10 s {Arrivals.BusiestWindowCount(trace, 10_000)}, 60 s {Arrivals.BusiestWindowCount(trace, 60_000)}");
+    Console.WriteLine($"   at 11 machines: average use {avg / 11 * 100:0.0}%; with one machine down (10) p99 slowdown {ServingSimulator.SlowdownPercentile(trace, baseline, 10, P99):0.00}");
+}
+
+// 7. Does 11 hold beyond the hour it was sized on? 200 hours rebuilt from 10-second blocks of the real one.
+Console.WriteLine();
+Console.WriteLine("7. 200 resampled hours (block bootstrap, 10-second blocks), A100");
+{
+    var trace = AzureTrace.ToRequests(rows, PrefillModel.SplitwiseA100);
+    var answers = new Dictionary<int, int>();
+    int missAt11 = 0, missAt12 = 0;
+    for (int seed = 1; seed <= 200; seed++)
+    {
+        var sample = Arrivals.BlockBootstrap(trace, 10_000, seed);
+        // On A100 machines, a request's idle A100 time is its prefill time, so it is also its baseline.
+        double[] b = sample.Select(r => r.PrefillMs).ToArray();
+        int a = (await Fewest(sample, b, ServingSimulator.MeetsSlowdownTarget(sample, b, P99, Target)))!.Value;
+        answers[a] = answers.GetValueOrDefault(a) + 1;
+        missAt11 += ServingSimulator.SlowdownPercentile(sample, b, 11, P99) > Target ? 1 : 0;
+        missAt12 += ServingSimulator.SlowdownPercentile(sample, b, 12, P99) > Target ? 1 : 0;
+    }
+    Console.WriteLine("   fewest machines: " + string.Join(", ", answers.OrderBy(x => x.Key).Select(x => $"{x.Key}: {x.Value / 2.0:0.#}%")));
+    Console.WriteLine($"   hours that miss the target at 11 machines: {missAt11 / 2.0:0.#}%, at 12: {missAt12 / 2.0:0.#}%");
+}
+
+// 8. Noise shared by the whole run, and re-checking only the boundary.
+Console.WriteLine();
+Console.WriteLine("8. Run-level noise, and confirming only the boundary, A100, 1,000 searches each");
+{
+    var trace = AzureTrace.ToRequests(rows, PrefillModel.SplitwiseA100);
+    var settings = new (string Name, double Sigma, double RunSigma, bool Confirm)[]
+    {
+        ("run-level sigma 0.1, one run per check", 0, 0.1, false),
+        ("run-level sigma 0.3, one run per check", 0, 0.3, false),
+        ("per-request sigma 0.3, then the boundary re-checked as a majority of 3", 0.3, 0, true),
+        ("run-level sigma 0.3, then the boundary re-checked as a majority of 3", 0, 0.3, true),
+    };
+    foreach (var (name, sigma, runSigma, confirm) in settings)
+    {
+        var random = new Random(20231116);
+        int calls = 0;
+        var noisy = Checks.NoisySlowdownTarget(trace, baseline, P99, Target, sigma, random, runSigma);
+        Func<int, CancellationToken, ValueTask<bool>> counted = (n, ct) => { calls++; return noisy(n, ct); };
+        var answers = new Dictionary<int, int>();
+        for (int run = 0; run < 1000; run++)
+        {
+            int a = (await ServingSimulator.FewestReplicasAsync(trace, counted)).Answer!.Value;
+            if (confirm)
+            {
+                a = await Checks.ConfirmBoundaryAsync(a, 3, counted, trace.Length);
+            }
+            answers[a] = answers.GetValueOrDefault(a) + 1;
+        }
+        string dist = string.Join(", ", answers.OrderBy(x => x.Key).Select(x => $"{x.Key}: {x.Value / 10.0:0.#}%"));
+        Console.WriteLine($"   {name}: {dist}; {calls / 1000.0:0.0} load tests per search");
+    }
+}
+
+// 9. A failing load test can stop as soon as it has failed. How much of the hour does each check need?
+Console.WriteLine();
+Console.WriteLine("9. Minutes of the trace each check needs before its result is known, A100");
+{
+    var trace = AzureTrace.ToRequests(rows, PrefillModel.SplitwiseA100);
+    double full = 0, early = 0;
+    var cells = new List<string>();
+    foreach (int n in new[] { 1, 2, 4, 8, 16, 12, 10, 11 })
+    {
+        double end = Checks.MsUntilDecided(trace, baseline, int.MaxValue - 1, P99, Target);
+        double decided = Checks.MsUntilDecided(trace, baseline, n, P99, Target);
+        full += end;
+        early += decided;
+        cells.Add($"{n}: {decided / 60_000:0.0}");
+    }
+    Console.WriteLine("   " + string.Join("  ", cells));
+    Console.WriteLine($"   the whole search: {full / 3_600_000:0.0} hours if every check runs to the end, {early / 3_600_000:0.0} hours if failing checks stop early");
+}
+
 return 0;
 
 string? Arg(string name)

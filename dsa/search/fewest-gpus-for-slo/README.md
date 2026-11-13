@@ -2,7 +2,7 @@
 ### Binary search on the answer, run on a real production trace
 
 **Tracks:** Search (binary search on the answer, doubling search, monotone checks)
-**Code:** `src/FewestGpus/`. **Tests:** 73, run with `dotnet test`. **Demos:** `demo/FewestGpus.Demo` (the search) and `demo/FewestGpus.Experiments` (what-if runs), on the Azure LLM inference trace
+**Code:** `src/FewestGpus/`. **Tests:** 78, run with `dotnet test`. **Demos:** `demo/FewestGpus.Demo` (the search) and `demo/FewestGpus.Experiments` (what-if runs), on the Azure LLM inference trace
 
 ---
 
@@ -12,7 +12,7 @@
 
 You can't answer it by dividing traffic by one machine's capacity, because requests queue behind each other.
 
-What the simulator here sizes: the machines that do the prompt work (prefill) up to the first token. It has no decode, so a machine is free again after the first token, like the prompt pool in Splitwise. Its one queue sends each request to the first free machine, a perfect router, so its answer is a lower bound for a real fleet. The only way to know if n machines is enough is to run a check (a load test or a simulation). Checks are expensive, so the goal is to run as few as possible.
+What the simulator here sizes: the machines that do the prompt work (prefill) up to the first token. It has no decode, so a machine is free again after the first token, like the prompt pool in Splitwise. Its one queue sends each request to the first free machine, a perfect router, which pushes the answer down. It has no batching, which pushes it up, because batching raises a real machine's prompt throughput. So the answer is an estimate with biases both ways, not a bound. The only way to know if n machines is enough is to run a check (a load test or a simulation). Checks are expensive, so the goal is to run as few as possible.
 
 <details><summary>Hint 1</summary>If 12 machines meet the target, what do you know about 13?</details>
 <details><summary>Hint 2</summary>Write the result for n = 1, 2, 3 ... as a row of N and Y. What shape is it?</details>
@@ -106,11 +106,15 @@ What the real trace shows:
 
 | Question | Result |
 |---|---|
-| The same prompts arriving smoothly (Poisson, same rate, 20 seeds) | 2 machines instead of 11 (H100: 1 instead of 5). The bursts cost 9 machines |
+| The same prompts arriving at random (Poisson, same average rate, 20 seeds) | 2 machines instead of 11 (H100: 1 instead of 5). The bursts cost 9 machines |
 | Work in the busiest window, as machines | 1 s: 15.8, 10 s: 9.4, 60 s: 2.5. The 10-second window is the useful estimate |
-| Without the busiest 60 seconds (723 requests) | Still 11. The 10-second bursts are spread over the hour |
-| Every 5-minute window must meet the target | 12 (H100: 6). At 11, the worst 5 minutes have p99 7.7x |
-| A noisy check (each prefill times a lognormal factor, sigma 0.3), 1,000 searches | 15.1% answer 10, too few. Majority of 3 per check: 6.6%, at 24 load tests instead of 8. With sigma 0.1, always 11 |
+| Without the busiest 60 seconds (723 requests) | Still 11 |
+| 200 hours rebuilt from random 10-second blocks of the real one | 11 in 58.5%, 7 in 27%, 6 in 6.5%, 12 in 6%. At 11 machines, 6% of those hours miss the target; at 12, none |
+| One machine down at 11 | p99 slowdown 6.73, a miss. Average use at 11 is 5.2% |
+| Every fixed 5-minute block must meet the target | 12 (H100: 6). At 11, the worst block has p99 7.7x |
+| A noisy check, each request's prefill times its own lognormal factor (sigma 0.3), 1,000 searches | 15.1% answer 10, too few. Majority of 3 per check: 6.6%, at 24 load tests. Only the boundary re-checked as a majority of 3: 7.1%, at 14.6. With sigma 0.1, always 11 |
+| Noise shared by the whole run (every request in one load test runs hot or cold together) | sigma 0.1: only 42.8% answer 11, spread 8 to 15. sigma 0.3: 15.5%, spread 4 to 21. Re-checking the boundary barely helps |
+| Stopping a failing load test as soon as it has failed | Failing checks are decided in 3 to 14 minutes; passing ones need the whole 57 minutes. The search drops from 7.6 hours to 3.5 |
 | The idle line 25% off in slope and fixed part | 9 to 13 |
 
 Target and percentile matter more than anything else:
@@ -129,7 +133,7 @@ Target and percentile matter more than anything else:
 
 | | Status |
 |---|---|
-| Search finds the fewest n; check counts in section 3 | **Tested** (73 tests, incl. thousands of random cases against trying every n) |
+| Search finds the fewest n; check counts in section 3 | **Tested** (78 tests, incl. thousands of random cases against trying every n) |
 | Simulator is monotone | **Tested** on random traces, argued in section 4 |
 | Traffic, target, machine size | **Cited** (section 5) |
 | Idle TTFT per request | **Our fit** to two published medians |
@@ -137,7 +141,7 @@ Target and percentile matter more than anything else:
 | Batching | **Left out.** A machine does one first token at a time; real servers batch, and batching changes prefill time |
 | Network time, decode | **Left out.** Only queueing plus prefill |
 | Fleet size | **Not claimed.** The traces are samples of two services; the answers are for this model of these samples |
-| What is sized | **The prompt pool, as a lower bound.** No decode, and a perfect router |
+| What is sized | **The prompt pool, as an estimate.** No decode and a perfect router push the answer down; no batching pushes it up |
 | A real load test as the check | **Noisy and maybe not monotone.** Re-check the answer and the one below it, or take a majority of several runs (section 5) |
 
 The part that carries over unchanged is the search: plug in a real load test as the check, and it makes the same calls.
@@ -169,7 +173,7 @@ dotnet run --project demo/FewestGpus.Demo -- --trace <path>/AzureLLMInferenceTra
 dotnet run --project demo/FewestGpus.Experiments -- --trace <path>/AzureLLMInferenceTrace_code.csv
 ```
 
-The what-if run takes about 3 minutes; most of it is the 4,000 noisy searches.
+The what-if run takes several minutes; most of it is the noisy searches.
 
 Requires .NET 10 SDK.
 
