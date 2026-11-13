@@ -68,8 +68,8 @@ public static class AnswerSearch
         return new SearchResult(inside ?? probe, log);
     }
 
-    // Everything below lo is known to fail, everything above hi is known to pass,
-    // best is the smallest pass seen so far.
+    // Everything below lo is known to fail. best is null, or it is hi + 1 and it passed,
+    // so it is the smallest pass seen so far.
     private static async ValueTask<int?> SearchAsync(
         int lo,
         int hi,
