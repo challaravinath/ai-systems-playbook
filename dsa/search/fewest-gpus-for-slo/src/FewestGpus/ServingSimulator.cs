@@ -53,7 +53,9 @@ public static class ServingSimulator
 
         double[] sorted = values.ToArray();
         Array.Sort(sorted);
-        int rank = (int)Math.Ceiling(p / 100.0 * sorted.Length);
+        // In decimal, so p / 100 * N lands exactly on a whole number when it should.
+        // In double, 7 / 100.0 * 100 is 7.000000000000001, and the ceiling would skip a rank.
+        int rank = (int)Math.Ceiling((decimal)p * sorted.Length / 100m);
         return sorted[Math.Max(rank, 1) - 1];
     }
 
