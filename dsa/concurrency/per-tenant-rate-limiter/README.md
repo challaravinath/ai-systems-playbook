@@ -2,7 +2,7 @@
 ### Token buckets in a hash map, run on a real production trace
 
 **Tracks:** Concurrency and hashing (token bucket, lazy refill, a lock per key)
-**Code:** `src/TenantRateLimiter/`. **Tests:** 26, run with `dotnet test`. **Demo:** `demo/`, on the Azure LLM inference trace
+**Code:** `src/TenantRateLimiter/`. **Tests:** 31, run with `dotnet test`. **Demo:** `demo/`, on the Azure LLM inference trace
 **Book:** a guided version, with a paper walkthrough, code flow and exercises, is Chapter 2 of [From Algorithms to AI Systems](https://leanpub.com/fromalgorithmstoaisystems).
 
 ---
@@ -89,7 +89,7 @@ These are the standard definitions; only the token bucket and the fixed window a
 | Customers | Each trace is one customer of the same API | **Our setup.** The traces are two services, not two customers |
 | Limits | Twice each customer's own average, for both requests and input tokens | **Our choice** |
 | Bucket size | 60 seconds of the limit, then 10 seconds for comparison | **Our choice** |
-| After a 429 | Not retried, only counted | **Our choice** |
+| After a 429 | Not retried, only counted. A second run retries (below) | **Our choice** |
 
 **The traffic:**
 
@@ -112,8 +112,39 @@ These are the standard definitions; only the token bucket and the fixed window a
 What the real trace shows:
 - **Same rule, different result.** Both customers get twice their average. The bursty one gets cut, the steady one never does.
 - **The bucket size matters as much as the rate.** The same per-minute limit with a 10-second bucket rejects about 7 times as many coding requests (2,320 against 318). This is the "429 while under my per-minute limit" that both API docs warn about.
-- **No customer slows another.** Conversation replayed on its own gets the same answer for every one of its 19,366 requests.
+- **No customer changes another's answers.** Conversation replayed on its own gets the same answer for every one of its 19,366 requests. The buckets are separate, so this is expected; the run checks it on real traffic. It checks decisions, not latency.
 - **The waits are short.** The bucket refills all the time instead of resetting each minute, so no wait can be longer than one big prompt's worth of refill: 7,437 tokens at 630,742 / 60 = 10,512 tokens a second is 0.7 seconds. The longest seen was 0.7 seconds.
+
+**One shared bucket instead of one per customer.** Same traffic, both customers behind one key, with both limits added together:
+
+| Bucket holds | Coding 429 | Conversation 429 |
+|---|---|---|
+| 60 s, separate | 318 | 0 |
+| 60 s, shared | 0 | 0 |
+| 10 s, separate | 2,320 | 0 |
+| 10 s, shared | 350 | 25 |
+
+Sharing works both ways. With room to spare, coding's bursts use allowance conversation isn't using, and nobody gets a 429. With a tight bucket, coding's bursts take allowance conversation needed, and conversation gets 25 429s it never gets on its own bucket.
+
+**How much the result depends on our two choices.** 429s as a share of requests, coding / conversation, separate buckets:
+
+| Limit | 1 s | 5 s | 10 s | 30 s | 60 s | 120 s |
+|---|---|---|---|---|---|---|
+| 1.5x average | 60.8 / 2.8 | 48.1 / 0.9 | 39.6 / 0.8 | 24.2 / 0.5 | 12.3 / 0.1 | 2.5 / 0.0 |
+| 2x average | 49.2 / 0.6 | 34.8 / 0.0 | 26.3 / 0.0 | 11.3 / 0.0 | 3.6 / 0.0 | 0.0 / 0.0 |
+| 3x average | 32.1 / 0.0 | 18.5 / 0.0 | 10.9 / 0.0 | 1.8 / 0.0 | 0.0 / 0.0 | 0.0 / 0.0 |
+
+With a 1-second bucket at 1.5x and 2x, one conversation prompt is bigger than the bucket and is refused as too big.
+
+**Clients that retry** (2x average, 60 s bucket, up to 5 tries per request):
+
+| Retry policy | Coding: first try | Passed on a retry | Gave up | Calls | Added delay p50 / p99 |
+|---|---|---|---|---|---|
+| None | 8,501 | | 318 | 8,819 | |
+| At Retry-After exactly | 8,238 | 271 | 310 | 10,979 | 0.65 s / 0.78 s |
+| Rounded up to whole seconds, plus up to 1 s jitter | 8,245 | 304 | 270 | 10,576 | 3.15 s / 7.07 s |
+
+Retries don't add capacity: about 8,500 coding requests get through either way. They change which ones, and they add about a fifth more calls. Conversation is unaffected.
 
 ---
 
@@ -121,7 +152,7 @@ What the real trace shows:
 
 | | Status |
 |---|---|
-| Bucket maths, both or neither, one lock per customer, cleanup | **Tested** (26 tests, incl. 300 random traces against a step-by-step bucket, and thread races) |
+| Bucket maths, both or neither, one lock per customer, cleanup | **Tested** (31 tests, incl. 300 random traces against a step-by-step bucket, and thread races) |
 | Same answers as .NET's `TokenBucketRateLimiter` | **Tested** for bursts at one instant and for requests bigger than the bucket. In our check, its manual refill (`TryReplenish`) added nothing until real time had passed, so it can't be stepped through time in a test |
 | Token bucket, per organization, requests and input tokens per minute | **Cited** (section 1) |
 | Two customers, the limits, the bucket sizes, no retries | **Our choices** (section 5) |
@@ -139,9 +170,10 @@ What the real trace shows:
 | Against a step-by-step bucket | 300 random traces, exact agreement on every decision and every token count |
 | Against .NET | a burst of mixed costs at one instant; a cost above capacity is refused up front |
 | Per customer | one customer's burst doesn't touch another; both or neither; Retry-After is the longer of the two waits; too big takes nothing; a shorter bucket; a burst too short to hold one request is refused |
+| Retry-After | never 0 for a limited request, and a retry at Retry-After gets through within 3 tries (20,000 random requests) |
 | Threads | 20,000 requests at one instant, exactly 1,000 through; cleanup running during requests lets nothing extra through; `RemoveIdle()` reads the same clock as `TryAcquire` |
 | Fixed window | 10 through around the reset against 5 for the token bucket |
-| Trace | CSV parsing and bad rows; per-minute averages; busiest window; replay per customer; the same answers alone or next to a noisy customer |
+| Trace | CSV parsing and bad rows; per-minute averages; busiest window; replay per customer; the same answers alone or next to a noisy customer; one shared bucket lets a noisy customer use up a quiet one's allowance; retries at Retry-After, rounding up, giving up |
 
 ---
 
@@ -169,6 +201,7 @@ Requires .NET 10 SDK.
 | Check, then take, without a lock | Two threads both take the last token |
 | `DateTime.Now` as the clock | It can jump; use a monotonic clock |
 | Making a too-big request wait | It never fits; reject it straight away |
+| Turning a tiny wait into a `TimeSpan` without rounding up | A bucket short by a rounding error says "retry after 0"; the client is refused forever |
 | Never removing customers | The map grows forever |
 | A burst too short to hold one request | Every request is too big, forever; refuse the setting |
 
