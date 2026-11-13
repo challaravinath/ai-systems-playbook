@@ -3,6 +3,7 @@
 
 **Tracks:** Search (binary search on the answer, doubling search, monotone checks)
 **Code:** `src/FewestGpus/`. **Tests:** 78, run with `dotnet test`. **Demos:** `demo/FewestGpus.Demo` (the search) and `demo/FewestGpus.Experiments` (what-if runs), on the Azure LLM inference trace
+**Book:** a guided version, with a paper walkthrough, code flow and exercises, is Chapter 3 of [From Algorithms to AI Systems](https://leanpub.com/fromalgorithmstoaisystems).
 
 ---
 
