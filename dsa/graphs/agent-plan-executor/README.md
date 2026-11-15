@@ -20,21 +20,21 @@
 
 ---
 
-## 1. Why this problem exists: where companies run this exact algorithm
+## 1. Why this problem exists: where this algorithm shows up
 
 The pattern is a **dependency count plus a ready queue**, which is Kahn's topological sort run live. It is the engine under most systems that run "work with dependencies":
 
-| Company / system | What the graph is | How the algorithm shows up | Source |
+| System | What the graph is | How the algorithm shows up | Source |
 |---|---|---|---|
-| **Meta: PyTorch autograd** | The backward graph of every training step | The engine first counts dependencies for every node, then queues a node's backward job once all its dependencies are met. That is Kahn's algorithm, run on multiple threads, on every `loss.backward()` | [PyTorch distributed autograd design](https://docs.pytorch.org/docs/2.14/rpc/distributed_autograd.html); [PyTorch dev on the engine](https://discuss.pytorch.org/t/is-pytorch-autograd-tape-based/13992/3) |
-| **LangChain: LangGraph** (agent frameworks) | An agent's nodes and edges | Nodes ready together run in parallel within a *superstep*, then synchronise (inspired by Pregel). `Send` fans out dynamically; `max_concurrency` limits parallelism. *Same problem, with K* | [LangGraph Pregel reference](https://reference.langchain.com/javascript/classes/_langchain_langgraph.pregel.Pregel.html) |
-| **Microsoft: Azure Durable Functions / Durable Task** (C#) | An orchestration's activities | The official **fan-out/fan-in** pattern: start activities without awaiting, then `await Task.WhenAll(...)`. The orchestrator is *replayed* from history, so it must be deterministic | [Microsoft Learn: fan-out/fan-in pattern](https://learn.microsoft.com/en-us/azure/durable-task/common/durable-task-fan-in-fan-out) |
-| **Netflix: Conductor** | Microservice workflows as a JSON blueprint, with fork/join, decisions and sub-workflows | A state-machine service, the *Decider*, combines the blueprint with the current state, works out the next state and schedules tasks. It orchestrated 2.6M+ process flows at the time it was open-sourced | [Conductor OSS docs](https://docs.conductor-oss.org); [coverage of the open-source release](https://www.opensourceforu.com/2016/12/netflix-open-sources-microservices-orchestration-engine/) |
-| **Uber: Cadence, then Temporal** | Durable workflows | Built at Uber because teams spent most of their time stitching message queues together. Temporal began as a fork of Cadence; its event history makes runs resumable after crashes (see follow-up F3) | [Temporal README](https://github.com/temporalio/temporal); [SE Daily with Cadence's creator](https://softwareengineeringdaily.com/2020/04/08/cadence-ubers-workflow-engine-with-maxim-fateev/) |
-| **Airbnb: Apache Airflow** | Data and ML pipelines as Python DAGs | The scheduler parses DAGs and hands runnable tasks to workers. *Pools* and per-DAG limits are its K; *trigger rules* are its failure policy (F8) | [Apache Airflow](https://en.wikipedia.org/wiki/Apache_Airflow); [Airflow docs](https://airflow.apache.org/docs/) |
-| **Google: Blaze / Bazel** | The build action graph | Actions run in parallel once their inputs exist, with results cached by input hash. Bazel is "what we use to build the large majority of software within Google" | [Google Open Source Blog, 2015](https://opensource.googleblog.com/2015/09/building-build-system-bazel-reaches-beta.html) |
-| **Google: TensorFlow** | The dataflow graph of ops | An op runs when its inputs are ready, and independent ops run in parallel across devices | [TensorFlow, OSDI '16](https://www.usenix.org/conference/osdi16/technical-sessions/presentation/abadi) |
-| **OpenAI: Ray** (Anyscale) | Task graphs built from futures | A task runs when the futures it depends on resolve. OpenAI said publicly it uses Ray to train its largest models | [Anyscale: Ray Summit 2022 LLM stories](https://www.anyscale.com/blog/ray-summit-2022-stories-large-language-models); [HPCwire](https://www.hpcwire.com/bigdatawire/2023/02/10/anyscale-bolsters-ray-the-super-scalable-framework-used-to-train-chatgpt/) |
+| **PyTorch autograd** | The backward graph of every training step | The engine first counts dependencies for every node, then queues a node's backward job once all its dependencies are met. That is Kahn's algorithm, run on multiple threads, on every `loss.backward()` | [PyTorch distributed autograd design](https://docs.pytorch.org/docs/2.14/rpc/distributed_autograd.html); [PyTorch dev on the engine](https://discuss.pytorch.org/t/is-pytorch-autograd-tape-based/13992/3) |
+| **LangGraph** (agent frameworks) | An agent's nodes and edges | Nodes ready together run in parallel within a *superstep*, then synchronise (inspired by Pregel). `Send` fans out dynamically; `max_concurrency` limits parallelism. *Same problem, with K* | [LangGraph Pregel reference](https://reference.langchain.com/javascript/classes/_langchain_langgraph.pregel.Pregel.html) |
+| **Durable Functions / Durable Task** (C#) | An orchestration's activities | The official **fan-out/fan-in** pattern: start activities without awaiting, then `await Task.WhenAll(...)`. The orchestrator is *replayed* from history, so it must be deterministic | [Microsoft Learn: fan-out/fan-in pattern](https://learn.microsoft.com/en-us/azure/durable-task/common/durable-task-fan-in-fan-out) |
+| **Conductor** | Microservice workflows as a JSON blueprint, with fork/join, decisions and sub-workflows | A state-machine service, the *Decider*, combines the blueprint with the current state, works out the next state and schedules tasks | [Conductor OSS docs](https://docs.conductor-oss.org) |
+| **Cadence, then Temporal** | Durable workflows | Temporal began as a fork of Cadence; its event history makes runs resumable after crashes (see follow-up F3) | [Temporal README](https://github.com/temporalio/temporal); [Cadence vs Temporal FAQ](https://cadenceworkflow.io/faq/cadence-vs-temporal) |
+| **Apache Airflow** | Data and ML pipelines as Python DAGs | The scheduler parses DAGs and hands runnable tasks to workers. *Pools* and per-DAG limits are its K; *trigger rules* are its failure policy (F8) | [Apache Airflow](https://en.wikipedia.org/wiki/Apache_Airflow); [Airflow docs](https://airflow.apache.org/docs/) |
+| **Bazel** | The build action graph | Actions run in parallel once their inputs exist, with results cached by input hash | [Bazel: intro](https://bazel.build/about/intro) |
+| **TensorFlow** | The dataflow graph of ops | An op runs when its inputs are ready, and independent ops run in parallel across devices | [TensorFlow, OSDI '16](https://www.usenix.org/conference/osdi16/technical-sessions/presentation/abadi) |
+| **Ray** | Task graphs built from futures | A task runs when the futures it depends on resolve | [Ray docs: tasks](https://docs.ray.io/en/latest/ray-core/tasks.html) |
 
 **Why it matters more now:** every agent framework is turning from a loop into a graph. The questions that matter in production are now graph and concurrency questions: whether the plan is valid, how fast it can run, what happens when step 7 of 12 times out, and how you stay under a quota of 5 GitHub calls at a time.
 
@@ -303,11 +303,11 @@ Requires .NET 10 SDK.
 ## Sources
 - PyTorch: [Distributed autograd design (dependency counting)](https://docs.pytorch.org/docs/2.14/rpc/distributed_autograd.html); [Forum: engine queues jobs when dependencies are satisfied](https://discuss.pytorch.org/t/is-pytorch-autograd-tape-based/13992/3)
 - LangGraph: [Pregel runtime reference](https://reference.langchain.com/javascript/classes/_langchain_langgraph.pregel.Pregel.html); [Forum: parallel fan-out best practices](https://forum.langchain.com/t/best-practices-for-parallel-nodes-fanouts/1900)
-- Microsoft: [Fan-out/fan-in pattern in Durable Functions (Microsoft Learn)](https://learn.microsoft.com/en-us/azure/durable-task/common/durable-task-fan-in-fan-out)
-- Netflix: [Conductor OSS docs](https://docs.conductor-oss.org); [Open-source release coverage](https://www.opensourceforu.com/2016/12/netflix-open-sources-microservices-orchestration-engine/); [Original slides](https://www.slideshare.net/slideshow/netflix-conductor/72015455)
-- Uber / Temporal: [Temporal repository](https://github.com/temporalio/temporal); [SE Daily: Cadence](https://softwareengineeringdaily.com/2020/04/08/cadence-ubers-workflow-engine-with-maxim-fateev/); [Cadence vs Temporal FAQ](https://cadenceworkflow.io/faq/cadence-vs-temporal)
-- Airbnb / Airflow: [Wikipedia: Apache Airflow](https://en.wikipedia.org/wiki/Apache_Airflow); [Airflow docs](https://airflow.apache.org/docs/)
-- Google: [Bazel reaches beta (Google Open Source Blog)](https://opensource.googleblog.com/2015/09/building-build-system-bazel-reaches-beta.html); [TensorFlow, OSDI '16](https://www.usenix.org/conference/osdi16/technical-sessions/presentation/abadi)
-- OpenAI / Ray: [Anyscale: Ray Summit 2022](https://www.anyscale.com/blog/ray-summit-2022-stories-large-language-models); [HPCwire](https://www.hpcwire.com/bigdatawire/2023/02/10/anyscale-bolsters-ray-the-super-scalable-framework-used-to-train-chatgpt/)
+- Durable Functions: [Fan-out/fan-in pattern (Microsoft Learn)](https://learn.microsoft.com/en-us/azure/durable-task/common/durable-task-fan-in-fan-out)
+- Conductor: [Conductor OSS docs](https://docs.conductor-oss.org)
+- Cadence / Temporal: [Temporal repository](https://github.com/temporalio/temporal); [Cadence vs Temporal FAQ](https://cadenceworkflow.io/faq/cadence-vs-temporal)
+- Airflow: [Wikipedia: Apache Airflow](https://en.wikipedia.org/wiki/Apache_Airflow); [Airflow docs](https://airflow.apache.org/docs/)
+- Bazel: [Intro](https://bazel.build/about/intro). TensorFlow: [OSDI '16 paper](https://www.usenix.org/conference/osdi16/technical-sessions/presentation/abadi)
+- Ray: [Tasks](https://docs.ray.io/en/latest/ray-core/tasks.html)
 
-*Company details come from public posts and docs, as of when they were published. Internal systems change; read them as "publicly described as...".*
+*Details come from each project's public docs, as of when they were published.*

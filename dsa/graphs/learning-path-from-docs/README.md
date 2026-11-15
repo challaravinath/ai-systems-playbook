@@ -22,7 +22,7 @@
 
 ## 1. Why this problem exists
 
-The [agent plan executor](../agent-plan-executor/) in this repo runs a plan with Kahn's algorithm. Kahn's needs a graph with no cycles. If there is one, it can tell you a cycle exists (some nodes never get placed), but it can't order them. For an agent plan that's fine: a plan with a cycle is a bad plan, so we reject it.
+The [agent plan executor](https://github.com/challaravinath/ai-systems-playbook/tree/main/dsa/graphs/agent-plan-executor) in this repo runs a plan with Kahn's algorithm. Kahn's needs a graph with no cycles. If there is one, it can tell you a cycle exists (some nodes never get placed), but it can't order them. For an agent plan that's fine: a plan with a cycle is a bad plan, so we reject it.
 
 A pile of docs is different. People write docs that point at each other all the time, and rejecting the whole pile isn't an option. So we need one more step before Kahn's:
 
@@ -30,13 +30,13 @@ A pile of docs is different. People write docs that point at each other all the 
 2. Squash each group into a single node. The result is the **condensation**, and it never has a cycle.
 3. Order the condensation with Kahn's.
 
-### Where I use it: building an agent's context
+### Example: building an agent's context
 
-In the hiring assistant I've been using as the example in this repo, the agent loads a set of instruction docs before it screens a candidate: the job spec format, the scoring rubric, the candidate dossier format, the interview loop and so on. The code that builds the prompt has to decide the order:
+Take a hiring assistant, the example used across this repo. The agent loads a set of instruction docs before it screens a candidate: the job spec format, the scoring rubric, the candidate dossier format, the interview loop and so on. The code that builds the prompt has to decide the order:
 
 - **Prerequisites first.** The job spec format goes in before the rubric that uses it.
 - **Cycles together.** The scoring rubric is defined against the dossier's fields, and the dossier says which rubric scores it carries. Neither comes first, so they go in side by side.
-- **The same order every time.** If the order changes between calls, the prompt beginning changes, and the [prefix cache](../../trees-and-tries/prefix-cache-radix-tree/) can't reuse anything. The order here only depends on the docs themselves, not on the order they were handed in. A test checks that.
+- **The same order every time.** If the order changes between calls, the prompt beginning changes, and the [prefix cache](https://github.com/challaravinath/ai-systems-playbook/tree/main/dsa/trees-and-tries/prefix-cache-radix-tree) can't reuse anything. The order here only depends on the docs themselves, not on the order they were handed in. A test checks that.
 - **A list of the tangles.** The cycle groups are useful on their own: they tell whoever owns the docs where the circular references are.
 
 ### The same pipeline outside AI
