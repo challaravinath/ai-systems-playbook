@@ -47,7 +47,7 @@ Full designs of AI systems, from the architecture down to failure modes, evaluat
 
 ## Book
 
-[From Algorithms to AI Systems](https://leanpub.com/fromalgorithmstoaisystems) is a book built on these problems, one chapter per problem, with paper walkthroughs, code flow and exercises. It grows as new problems are added here. The code in this repo stays free.
+[From Algorithms to AI Systems](https://leanpub.com/fromalgorithmstoaisystems) is a book built on these problems, one chapter per problem, with paper walkthroughs, code flow and exercises. It grows as new problems are added here. The code in this repo stays free. And this take more deeper dive on each topic with key desicsions made across.
 
 ---
 
