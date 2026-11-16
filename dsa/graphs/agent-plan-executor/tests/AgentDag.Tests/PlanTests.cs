@@ -54,6 +54,19 @@ public class PlanTests
     }
 
     [Fact]
+    public void Paper_step_1_the_dossier_plan_comes_out_in_this_order()
+    {
+        // Ready steps leave a min-heap on id, so score (s) goes before web_lookup (w), and so do rerank and fairness.
+        var plan = Plan.Build([
+            N("parse", 100), N("web_lookup", 2000, "parse"), N("score", 300, "parse"),
+            N("rerank", 400, "score"), N("fairness", 50, "rerank"), N("dossier", 800, "web_lookup", "fairness"),
+        ]);
+        Assert.Equal(["parse", "score", "rerank", "fairness", "web_lookup", "dossier"], plan.TopologicalOrder);
+        Assert.Equal([2900, 2800, 1550, 1250, 850, 800],
+            new[] { "parse", "web_lookup", "score", "rerank", "fairness", "dossier" }.Select(id => plan.BottomLevel[id].TotalMilliseconds));
+    }
+
+    [Fact]
     public void Duplicate_dependencies_count_once()
     {
         var plan = Plan.Build([new PlanNode("a"), new PlanNode("b", "a", "a")]);

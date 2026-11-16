@@ -3,7 +3,8 @@
 
 **Tracks:** Graphs (topological sort, cycle detection, DP on a DAG) and concurrency (C# async, channels, cancellation)
 **Reading time:** about 40 minutes, longer if you try it yourself first
-**Code:** `src/AgentDag/Plan.cs`, `src/AgentDag/DagExecutor.cs`. **Tests:** 23, run with `dotnet test`
+**Code:** `src/AgentDag/Plan.cs`, `src/AgentDag/DagExecutor.cs`. **Tests:** 48, run with `dotnet test`
+**Book:** a guided version, with worked examples, the design decisions and what-if experiments, is Chapter 4 of [From Algorithms to AI Systems](https://leanpub.com/fromalgorithmstoaisystems).
 
 ---
 
@@ -51,7 +52,7 @@ The pattern is a **dependency count plus a ready queue**, which is Kahn's topolo
 | Can steps be cancelled? | Need cooperative cancellation | Yes, through a `CancellationToken` |
 | How big are plans? | Recursion depth, heap size | Up to around 100,000 nodes (map fan-outs), so **no recursion** |
 | Do outputs fit in memory? | Ref-count and release outputs | Yes for now; release them in F4 |
-| Must the order be deterministic? | Needed for replay, audit and tests | Yes: break ties by id |
+| Must the order be deterministic? | Needed for replay, audit and tests | Ties are broken by id. Which node finishes first depends on real time, so a run repeats only when its nodes finish in the same order |
 
 ---
 
@@ -156,34 +157,36 @@ while (true)
 
 ### 6.3 Invariants (the properties that make it correct)
 
-1. **`running` stays between 0 and K**, always. The loop is the only place that changes `running`.
+1. **`running` stays between 0 and K**, always. The loop is the only place that changes `running`. It counts steps: a tool that ignored its timeout keeps running outside the count until it ends (`StillRunning`).
 2. **A node starts only after all its parents have *succeeded*.** It is enqueued only when `waitingOn` reaches 0, and that only happens on success.
 3. **Every node starts at most once.** It is enqueued exactly once, because its count reaches 0 exactly once.
 4. **Every started node reports exactly once.** `RunNodeAsync` catches everything and writes once, so the loop can wait without a timeout and never hangs.
 5. **At the end, every node has exactly one result:** Succeeded, Failed, Skipped or Cancelled. Nothing goes missing.
-6. **No shared mutable state between workers.** Each worker gets a fresh copy of its inputs.
+6. **No shared mutable state in the scheduler.** Each worker gets its own inputs dictionary. The outputs inside it are shared with sibling nodes, so tools treat them as read-only.
 
 ### 6.4 Failure semantics
 
 | Event | SkipDescendants (default) | FailFast |
 |---|---|---|
-| A node throws a retryable error (`HttpRequestException`, `IOException`, timeout) | Retry with exponential backoff and full jitter, up to `MaxAttempts` | Same |
+| A node throws a retryable error (timeout, `IOException`, an HTTP failure with no response, 408, 429 or 5xx) | Retry with exponential backoff and full jitter, up to `MaxAttempts` (1 by default, so retries are off until you set it) | Same |
+| A node gets 400, 401, 404 or another HTTP status that won't change | No retry; the node fails | Same |
 | A node throws a bug (`ArgumentException` and similar) | **No retry**; the node fails; all its descendants are skipped; other branches continue | The node fails; the run token is cancelled; in-flight nodes end as Cancelled; nothing new starts |
-| A node hangs | The per-attempt timeout (`CancelAfter`) raises `TimeoutException`, which is retryable | Same |
-| The tool ignores its token | `WaitAsync(token)` stops *waiting* on it, so the run continues; the stray work is reported in metrics | Same |
-| The user cancels | In-flight nodes see the token and end as Cancelled; unstarted nodes are Cancelled | Same |
+| A node hangs | The per-attempt timeout (`CancelAfter`) raises `TimeoutException`, which is retryable. With no `NodeTimeout` set, nothing stops it, so set one for every tool you don't control | Same |
+| The tool ignores its token | `WaitAsync(token)` stops *waiting* on it after a short grace, so the run continues. The node fails and is **not retried**, because a retry would run the same tool twice at once. The run result lists it in `StillRunning`, and `StrayWork` completes when it ends. While it runs it is outside K | Same |
+| The tool throws `OperationCanceledException` on its own | It's the tool's error, not a timeout, so it isn't retried as one | Same |
+| The user cancels | In-flight nodes see the token and end as Cancelled, even if a tool wraps the cancel in its own exception; unstarted nodes are Cancelled | Same |
 
 ### 6.5 C# concurrency details that matter here
 
 - **`Channel<T>` with `SingleReader = true`** for completions. It is lock-free in practice and keeps the single-owner model honest.
-- **`Task.Yield()` at the top of each worker.** A work function that blocks *before* its first `await` would otherwise run on the scheduler's thread and stall the loop.
+- **Force a yield at the top of each worker** with `await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding)`. A work function that blocks *before* its first `await` would otherwise run on the scheduler's thread and stall the loop. Plain `Task.Yield()` isn't enough: under a UI-style synchronization context it posts back to that context's one thread.
 - **Fire-and-forget only when it's safe.** `_ = RunNodeAsync(...)` is fine *only* because that method can't throw and always reports. Never write `async void`.
 - **`WaitAsync(token)` does not stop the work.** It only stops waiting. Real cancellation is cooperative: tools must pass `ctx.Cancellation` into `HttpClient` and similar calls.
 - **Dispose every `CancellationTokenSource`** (`using`). A linked CTS registers with its parent and leaks if not disposed.
 - **`ConfigureAwait(false)` in library code**, so it can't deadlock against a caller's synchronisation context.
 - **Never `.Result` or `.Wait()`** on async work. Sync-over-async deadlocks and exhausts the thread pool.
 - **For a flat fan-out with no edges**, `Parallel.ForEachAsync(items, new ParallelOptions { MaxDegreeOfParallelism = K }, ...)` is the built-in, but it has no notion of dependencies, which is why it isn't enough here.
-- **Retry only idempotent work.** `ctx.Attempt` exists so a tool can reuse the same idempotency key on every attempt, so a retried "charge" or "send email" doesn't happen twice.
+- **Retry only idempotent work.** A timeout means the outcome is unknown: the tool may have done its side effect before it saw the cancel. Give each side effect an idempotency key that is the same on every attempt (your run id plus `ctx.NodeId`). `ctx.Attempt` only tells the tool it is a retry; keep it out of the key.
 
 ### 6.6 Complexity
 
@@ -192,7 +195,7 @@ while (true)
 | Validate + order | O(V + E), plus O(V log V) for the deterministic heap |
 | Scheduling | O((V + E) + V log V) heap work. Scheduling overhead is microseconds per node; tool latency (ms to s) dominates |
 | Memory | O(V + E) for the graph and counters, plus every output held until the end. **F4 fixes that** |
-| Skipping descendants | O(V + E) in total in the worst case. Cache descendant sets if many failures are expected |
+| Skipping descendants | O(V + E) in total, however many nodes fail, because the walk stops at nodes already skipped. A test fails 20,000 nodes that share one 20,000-step chain |
 
 ---
 
@@ -212,6 +215,17 @@ while (true)
 | `Manager_cancels_mid_run_and_every_node_is_accounted_for` | Invariant 5 under cancellation |
 | `With_one_slot_the_node_with_the_longest_tail_starts_first` | Critical-path-first priority |
 | `Parallel_run_takes_about_the_critical_path_not_the_sum` | Real speedup, close to the critical path |
+| `Tool_that_ignores_its_timeout_is_not_retried_on_top_of_itself` | A tool that keeps running after its timeout is never run twice at once, and is listed in `StillRunning` |
+| `Each_attempt_gets_its_own_timeout_so_a_fast_retry_succeeds` | Timeouts are per attempt |
+| `Tool_that_cancels_itself_is_its_own_error_not_a_timeout` | Only our own timeout counts as a timeout |
+| `Fail_fast_still_returns_results_when_a_cancel_callback_throws` / `Fail_fast_reports_a_sibling_that_reacts_to_the_cancel_with_its_own_error_as_cancelled` | Fail-fast always returns, with the right statuses |
+| `Work_never_runs_on_the_callers_synchronization_context` | Workers leave a UI-style context |
+| `Thousands_of_failures_skip_their_shared_descendants_in_linear_time` | Skipping is O(V + E) in total |
+| `Cancelling_during_the_wait_between_retries_ends_the_node_as_cancelled` | Cancellation reaches the backoff |
+| `Plan_json_with_holes_is_a_validation_error` / `A_built_plan_does_not_change_when_the_callers_list_does` | Bad LLM JSON is rejected; a built plan can't be changed afterwards |
+| `Stray_work_can_be_awaited_before_running_the_plan_again` | `StrayWork` completes only when a stray tool has really finished |
+| `Only_http_failures_that_may_go_away_are_retried` / `Bugs_are_not_transient_but_timeouts_and_io_are` | Retry classification by HTTP status |
+| `Paper_step_1_the_dossier_plan_comes_out_in_this_order` / `Paper_step_5_with_two_slots_the_step_with_work_behind_it_starts_first` | The worked examples, as tests |
 
 ---
 
@@ -229,7 +243,7 @@ while (true)
 
 **F3. "The process dies 9 minutes into a 10-minute run."**
 - Make it **durable.** Append every state change (started, succeeded with output reference, failed) to an event log before acting on it. On restart, replay the log to rebuild the counters, and re-run only nodes that never finished.
-- Side effects need **idempotency keys** (`runId:nodeId:attempt`).
+- Side effects need **idempotency keys** that stay the same on every attempt (`runId:nodeId`). A key with the attempt number in it changes on retry, so a retried charge would happen twice.
 - This is exactly Temporal's and Durable Functions' model, and it is why their orchestrator code must be deterministic: replay re-runs it.
 
 **F4. "Plans with 50,000 nodes run out of memory."**
@@ -293,7 +307,8 @@ while (true)
 
 ```bash
 cd dsa/graphs/agent-plan-executor
-dotnet test          # 23 tests: Plan (10) + Executor (13)
+dotnet test          # 48 tests: Plan (11) + Executor (13) + Hardening (24)
+dotnet run -c Release --project demo/AgentDag.Experiments   # what-if runs, simulated plans
 ```
 
 Requires .NET 10 SDK.

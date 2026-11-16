@@ -13,16 +13,20 @@ public class ExecutorTests
     [Fact]
     public async Task Each_node_receives_exactly_its_parents_outputs()
     {
-        var plan = Plan.Build([new PlanNode("a"), new PlanNode("b"), new PlanNode("sum", "a", "b")]);
+        // "other" runs first and is unrelated, so it must not show up in sum's inputs.
+        var plan = Plan.Build([new PlanNode("other"), new PlanNode("a", "other"), new PlanNode("b"), new PlanNode("sum", "a", "b")]);
+        IReadOnlyCollection<string>? seen = null;
         var work = new Dictionary<string, NodeWork>
         {
+            ["other"] = _ => Task.FromResult<object?>(1000),
             ["a"] = _ => Task.FromResult<object?>(2),
             ["b"] = _ => Task.FromResult<object?>(40),
-            ["sum"] = ctx => Task.FromResult<object?>(ctx.Inputs.Values.Sum(v => (int)v!)),
+            ["sum"] = ctx => { seen = [.. ctx.Inputs.Keys]; return Task.FromResult<object?>(ctx.Inputs.Values.Sum(v => (int)v!)); },
         };
         var run = await new DagExecutor().RunAsync(plan, work);
         Assert.True(run.Succeeded);
         Assert.Equal(42, run["sum"].Output);
+        Assert.Equal(["a", "b"], seen!.Order(StringComparer.Ordinal));
     }
 
     [Fact]
@@ -103,6 +107,8 @@ public class ExecutorTests
         Assert.True(DateTime.UtcNow - t0 < TimeSpan.FromSeconds(5));
         Assert.Equal(NodeStatus.Failed, run["bad"].Status);
         Assert.Equal(NodeStatus.Cancelled, run["slow"].Status);
+        Assert.Contains("slow", started);                 // it was in flight, not just never started
+        Assert.Equal(1, run["slow"].Attempts);
         Assert.Equal(NodeStatus.Cancelled, run["after_slow"].Status);
         Assert.DoesNotContain("after_slow", started);
     }
@@ -113,7 +119,7 @@ public class ExecutorTests
         var plan = Plan.Build([new PlanNode("github")]);
         var calls = 0;
         var run = await new DagExecutor(NoBackoff with { MaxAttempts = 3 }).RunAsync(plan, Work(plan, ctx =>
-            Interlocked.Increment(ref calls) < 3 ? throw new HttpRequestException("429 Too Many Requests") : Task.FromResult<object?>(ctx.Attempt)));
+            Interlocked.Increment(ref calls) < 3 ? throw new HttpRequestException("Too Many Requests", null, System.Net.HttpStatusCode.TooManyRequests) : Task.FromResult<object?>(ctx.Attempt)));
         Assert.Equal(NodeStatus.Succeeded, run["github"].Status);
         Assert.Equal(3, run["github"].Attempts);
         Assert.Equal(3, run["github"].Output);
@@ -158,9 +164,17 @@ public class ExecutorTests
     {
         var plan = Plan.Build([new PlanNode("a"), new PlanNode("b", "a"), new PlanNode("c", "b")]);
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
-        var run = await new DagExecutor().RunAsync(plan, Work(plan, async ctx => { await Task.Delay(TimeSpan.FromSeconds(30), ctx.Cancellation); return null; }), cts.Token);
+        var aCleanedUp = false;
+        var run = await new DagExecutor().RunAsync(plan, Work(plan, async ctx =>
+        {
+            try { await Task.Delay(TimeSpan.FromSeconds(30), ctx.Cancellation); return null; }
+            finally { await Task.Delay(20); Volatile.Write(ref aCleanedUp, true); }
+        }), cts.Token);
         Assert.Equal(3, run.Nodes.Count);
         Assert.All(run.Nodes.Values, r => Assert.Equal(NodeStatus.Cancelled, r.Status));
+        Assert.Equal(1, run["a"].Attempts);              // a was in flight
+        Assert.True(Volatile.Read(ref aCleanedUp));       // and the run waited for it to stop
+        Assert.Empty(run.StillRunning);
     }
 
     [Fact]
@@ -180,15 +194,21 @@ public class ExecutorTests
     [Fact]
     public async Task Parallel_run_takes_about_the_critical_path_not_the_sum()
     {
-        // Four 200 ms lookups in parallel, then a 100 ms join: ~300 ms, not ~900 ms.
+        // Four 200 ms lookups in parallel, then a 100 ms join: about 300 ms, not about 900 ms.
+        // The overlap is checked directly; the clock only has to beat the sequential 900 ms.
         var plan = Plan.Build([.. Enumerable.Range(0, 4).Select(i => new PlanNode($"l{i}")), new PlanNode("join", "l0", "l1", "l2", "l3")]);
+        int started = 0, startedWhenFirstLookupEnded = -1;
         var sw = System.Diagnostics.Stopwatch.StartNew();
         await new DagExecutor(new ExecutorOptions { MaxConcurrency = 4 }).RunAsync(plan, Work(plan, async ctx =>
         {
-            await Task.Delay(ctx.NodeId == "join" ? 100 : 200, ctx.Cancellation);
+            if (ctx.NodeId == "join") { await Task.Delay(100, ctx.Cancellation); return null; }
+            Interlocked.Increment(ref started);
+            await Task.Delay(200, ctx.Cancellation);
+            Interlocked.CompareExchange(ref startedWhenFirstLookupEnded, Volatile.Read(ref started), -1);
             return null;
         }));
-        Assert.InRange(sw.ElapsedMilliseconds, 280, 700);
+        Assert.Equal(4, startedWhenFirstLookupEnded);
+        Assert.InRange(sw.ElapsedMilliseconds, 280, 899);
     }
 
     [Fact]

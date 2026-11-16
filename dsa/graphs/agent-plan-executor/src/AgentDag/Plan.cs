@@ -51,12 +51,18 @@ public sealed class Plan
     /// <summary>Validate and build. O(V + E) apart from the O(V log V) deterministic tie-break.</summary>
     public static Plan Build(IEnumerable<PlanNode> nodes)
     {
+        ArgumentNullException.ThrowIfNull(nodes);
         var map = new Dictionary<string, PlanNode>(StringComparer.Ordinal);
         foreach (var n in nodes)
         {
+            // A plan parsed from an LLM's JSON can have holes the type system says can't happen.
+            if (n is null) throw new PlanValidationException("The plan contains a null node.");
             if (string.IsNullOrWhiteSpace(n.Id)) throw new PlanValidationException("A node has an empty id.");
+            if (n.DependsOn is null) throw new PlanValidationException($"Node '{n.Id}' has no dependency list. Use an empty list for none.");
+            if (n.DependsOn.Any(string.IsNullOrWhiteSpace)) throw new PlanValidationException($"Node '{n.Id}' has an empty dependency id.");
             if (n.EstimatedLatency < TimeSpan.Zero) throw new PlanValidationException($"Node '{n.Id}' has a negative latency estimate.");
-            if (!map.TryAdd(n.Id, n)) throw new PlanValidationException($"Duplicate node id '{n.Id}'.");
+            // Keep our own copy, so the caller can't change the plan after it was validated.
+            if (!map.TryAdd(n.Id, n with { DependsOn = Array.AsReadOnly(n.DependsOn.ToArray()) })) throw new PlanValidationException($"Duplicate node id '{n.Id}'.");
         }
 
         var parents = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
@@ -70,7 +76,7 @@ public sealed class Plan
                 if (!map.ContainsKey(d)) throw new PlanValidationException($"Node '{n.Id}' depends on unknown node '{d}'.");
                 children[d].Add(n.Id);
             }
-            parents[n.Id] = distinct;
+            parents[n.Id] = distinct.AsReadOnly();
         }
 
         // Kahn's algorithm. A min-heap on id (instead of a plain queue) makes the order reproducible,
@@ -96,7 +102,7 @@ public sealed class Plan
         }
 
         return new Plan(map, parents,
-            children.ToDictionary(kv => kv.Key, kv => (IReadOnlyList<string>)kv.Value, StringComparer.Ordinal), order);
+            children.ToDictionary(kv => kv.Key, kv => (IReadOnlyList<string>)kv.Value.AsReadOnly(), StringComparer.Ordinal), order);
     }
 
     /// <summary>
