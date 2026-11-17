@@ -61,7 +61,7 @@ A few choices worth knowing:
 
 ## What I measured
 
-> **Simulated.** Every row of scores below is made up, not taken from a model. My assumption: probability falls off with rank like a power law, p(rank r) proportional to r^-s, with token ids shuffled. Larger s means a peaked distribution (the model is sure), smaller s a flat one. The sizes in tables 2 and 3 depend entirely on that shape. Times are one CPU thread in C#; real engines run this step on the GPU, over a whole batch at once. Read the times as a comparison between methods, nothing more.
+> **Simulated.** Every row of scores below is made up, not taken from a model. My assumption: probability falls off with rank like a power law, p(rank r) proportional to r^-s, with token ids shuffled. Larger s means a peaked distribution (the model is sure), smaller s a flat one. The sizes in tables 2 and 3 depend entirely on that shape. Times are one CPU thread in C#; real engines run this step on the GPU, over a whole batch at once. Read the times as a comparison between methods, nothing more. Each table draws its own random rows, so the same shape gives slightly different counts from table to table: at s = 1.1, p = 0.9 and temperature 1.0, tables 2, 3 and 5 keep 15,704, 14,231 and 14,211 tokens.
 
 **1. Finding the top k: time per row** (median of 31 runs)
 
@@ -96,7 +96,7 @@ The heap helps most when the model is sure. When the nucleus is most of the voca
 
 This is the paper's argument [1], seen on made-up rows: k = 50 is more than enough in one case and covers 13.5% in another.
 
-**4. The order matters.** Top-k 50 then top-p 0.9 (vLLM's order) against top-p then top-k, on 1,000 rows: the kept set was different in all 1,000. On average 24.7 tokens against 43.4, because after top-k the probabilities are renormalised over just 50 tokens, and 0.9 of that is reached sooner.
+**4. The order matters.** Top-k 50 then top-p 0.9 (vLLM's order) against top-p then top-k, on 1,000 rows (vocabulary 32,000, s drawn at random between 0.6 and 1.8): the kept set was different in all 1,000. On average 24.7 tokens against 43.4, because after top-k the probabilities are renormalised over just 50 tokens, and 0.9 of that is reached sooner.
 
 **5. Temperature moves the nucleus a lot.** Tokens kept at p = 0.9 (s = 1.1, vocabulary 128,000): temperature 0.5 keeps 4, 0.7 keeps 35, 1.0 keeps 14,211, 1.3 keeps 69,666. Top-p and temperature aren't independent knobs.
 
