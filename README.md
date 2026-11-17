@@ -4,7 +4,7 @@
 
 Underneath every AI system are old, well-understood ideas: graphs, heaps, hashing, dynamic programming, concurrency. An agent running its plan is a topological sort. A prompt cache can be a radix tree with LRU eviction. Packing retrieved chunks into a context window is a knapsack problem.
 
-This playbook takes one real AI problem at a time and works it through properly: why the problem exists, where companies run the algorithm in production (with sources), how to solve it and why it's correct, what breaks at scale, and C# code with tests that run.
+This playbook takes one real AI problem at a time and works it through properly: why the problem exists, where the algorithm shows up in real systems (with sources), how to solve it and why it's correct, what breaks at scale, and C# code with tests that run.
 
 [![tests](../../actions/workflows/test.yml/badge.svg)](../../actions/workflows/test.yml)
 
@@ -13,7 +13,7 @@ This playbook takes one real AI problem at a time and works it through properly:
 ## What every problem contains
 
 1. **The problem**, stated plainly, with hints you can expand, so you can try it first.
-2. **Where it runs in the real world:** which companies use this algorithm, for what, with links to their docs, papers or engineering posts.
+2. **Where it runs in the real world:** which systems use this algorithm, for what, with links to their docs or papers.
 3. **The questions that shape the design**, and how each answer changes it.
 4. **The mental model:** the one idea that carries the solution.
 5. **From brute force to optimal**, with complexity, and the trade-offs between designs.
@@ -33,11 +33,12 @@ Each problem folder also has a PDF of its README for offline reading.
 
 | Problem | Patterns | Real-world anchor | Status |
 |---|---|---|---|
-| [Agent plan executor](dsa/graphs/agent-plan-executor/) | Topological sort, cycle detection, DP on a DAG, bounded concurrency, cancellation | PyTorch autograd, LangGraph, Durable Functions, Temporal, Airflow, Bazel | Done, 23 tests |
+| [Agent plan executor](dsa/graphs/agent-plan-executor/) | Topological sort, cycle detection, DP on a DAG, bounded concurrency, cancellation | PyTorch autograd, LangGraph, Durable Functions, Temporal, Airflow, Bazel | Done, 48 tests |
 | [Prefix-cache radix tree](dsa/trees-and-tries/prefix-cache-radix-tree/) | Trie, radix tree, LRU eviction over leaves with a min-heap, reference counting | SGLang RadixAttention, vLLM prefix caching, NVIDIA Dynamo, provider prompt caching | Done, 26 tests |
 | [Learning path from a pile of docs](dsa/graphs/learning-path-from-docs/) | Strongly connected components (Tarjan, Kosaraju), condensation DAG, topological sort with a stable tie-break | CMake target dependencies, LLVM SCC iterator | Done, 65 tests |
-| [Fewest GPUs that meet the SLO](dsa/search/fewest-gpus-for-slo/) | Binary search on the answer, doubling search, monotone checks | Azure LLM inference trace, Splitwise SLO, Triton Perf Analyzer `--binary-search` | Done, 52 tests |
-| [Per-tenant rate limiter](dsa/concurrency/per-tenant-rate-limiter/) | Token bucket with lazy refill, a hash map of buckets per customer, a lock per customer | Claude API rate limits, Azure OpenAI quotas, .NET `TokenBucketRateLimiter`, Azure LLM inference trace | Done, 24 tests |
+| [Fewest GPUs that meet the SLO](dsa/search/fewest-gpus-for-slo/) | Binary search on the answer, doubling search, monotone checks | Azure LLM inference trace, Splitwise SLO, Triton Perf Analyzer `--binary-search` | Done, 78 tests |
+| [Per-tenant rate limiter](dsa/concurrency/per-tenant-rate-limiter/) | Token bucket with lazy refill, a hash map of buckets per customer, a lock per customer | Claude API rate limits, Azure OpenAI quotas, .NET `TokenBucketRateLimiter`, Azure LLM inference trace | Done, 31 tests |
+| [Top-k and top-p sampling](dsa/heaps/top-k-top-p-sampling/) | Size-k min-heap, heapify and pop, quickselect, stable softmax | vLLM sampler order, Hugging Face top-k / top-p warpers, nucleus sampling paper | Done, 67 tests |
 
 ### System design
 
@@ -67,7 +68,7 @@ I write one LinkedIn post a week about a problem in this repo. Each post links t
 
 ## Roadmap
 
-**Up next:** *Top-k / top-p sampling*; *Pack the context window*; *Near-duplicate detection in training data*.
+**Up next:** *Dynamic batcher*; *Pack the context window*; *Near-duplicate detection in training data*.
 
 The full plan, 25 problems and 12 system designs, is in **[ROADMAP.md](ROADMAP.md)**. Each DSA problem builds a component that a later design uses: the rate limiter and the retries become parts of the AI gateway, the radix tree and the batcher become parts of inference serving.
 
@@ -77,7 +78,7 @@ Problems are grouped by pattern, and each group is a folder under `dsa/`:
 |---|---|---|
 | Graphs and DAGs | Topological sort, SCC, union-find, shortest paths | Agent plan execution (done), document prerequisite graphs (done), entity resolution, tool-call loop detection |
 | Trees and tries | Trie, radix tree, segment tree, tree search | Prefix-cache radix tree with LRU (done), tokenizer prefix match, beam search |
-| Heaps and top-K | Heaps, k-way merge, streaming quantiles | Top-k / top-p sampling, merging shard results, p99 latency |
+| Heaps and top-K | Heaps, k-way merge, streaming quantiles | Top-k / top-p sampling (done), merging shard results, p99 latency |
 | Hashing and caching | LRU/LFU with expiry, consistent hashing, Bloom, MinHash | Semantic cache, session affinity, training-data dedup |
 | Search | kNN, IVF/HNSW, binary search on the answer | Vector search, the fewest GPUs that meet an SLO (done) |
 | DP and strings | Knapsack, edit distance, Viterbi | Packing the context window, word error rate, chunking |
