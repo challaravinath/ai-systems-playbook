@@ -5,7 +5,7 @@ A living plan. Problems are built in roughly this order, and the order changes a
 **Status** is one of: Done, In progress, Planned.
 
 **Next up:**
-1. Top-k / top-p sampling
+1. Dynamic batcher: send at max size *or* max wait
 2. Pack the context window
 3. Near-duplicate detection in training data
 
@@ -24,7 +24,7 @@ A living plan. Problems are built in roughly this order, and the order changes a
 | [Learning path from a pile of docs](dsa/graphs/learning-path-from-docs/) | SCC (Tarjan, Kosaraju), condensation DAG, topological sort | Enterprise RAG | Done |
 | [Per-tenant rate limiter](dsa/concurrency/per-tenant-rate-limiter/) | Hashing, token bucket, a lock per customer | AI gateway | Done |
 | Dynamic batcher: send at max size *or* max wait | Bounded channels, timers, back-pressure | Inference serving | Planned |
-| Top-k and top-p sampling | Heaps, partial sort, numerically stable softmax | Inference serving | Planned |
+| [Top-k and top-p sampling](dsa/heaps/top-k-top-p-sampling/) | Heaps, quickselect, numerically stable softmax | Inference serving | Done |
 | Merge ranked results from N shards | k-way merge, reciprocal rank fusion | Enterprise RAG | Planned |
 | Semantic cache | LRU + TTL, similarity threshold, kNN | Semantic cache at scale | Planned |
 | Session affinity with consistent hashing and bounded loads | Consistent hashing, load caps | Inference serving | Planned |
