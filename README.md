@@ -47,9 +47,11 @@ Full designs of AI systems, from the architecture down to failure modes, evaluat
 ---
 
 ## Book
- If you want more depth, From Algorithms to AI Systems (https://leanpub.com/fromalgorithmstoaisystems) takes each problem here further. It shows where the algorithm fits in real systems, traces it by hand, explains why each design choice beat the alternatives, and covers what reviews caught after the code first worked. The code in this repo stays free.
 
- It's an ebook (PDF), published as it grows, and buyers get every new chapter as an update at no extra cost.
+If you want more depth, From Algorithms to AI Systems (https://leanpub.com/fromalgorithmstoaisystems) takes each problem here further. It shows where the algorithm fits in real systems, traces it by hand, explains why each design choice beat the alternatives, and covers what reviews caught after the code first worked. The code in this repo stays free.
+
+It's an ebook (PDF), published as it grows, and buyers get every new chapter as an update at no extra cost.
+
 ---
 
 ## Posts
@@ -63,6 +65,7 @@ I write one LinkedIn post a week about a problem in this repo. Each post links t
 | [Ordering docs that depend on each other](https://lnkd.in/p/dmkKHdxM) | [Learning path from a pile of docs](dsa/graphs/learning-path-from-docs/) |
 | [Sizing an LLM endpoint with binary search](https://lnkd.in/p/dHHmqYjJ) | [Fewest GPUs that meet the SLO](dsa/search/fewest-gpus-for-slo/) |
 | [Per-customer rate limits for an LLM API](https://lnkd.in/p/d75dfh3m) | [Per-tenant rate limiter](dsa/concurrency/per-tenant-rate-limiter/) |
+| [How the serving engine picks each token](https://lnkd.in/p/dg4Kt4Ma) | [Top-k and top-p sampling](dsa/heaps/top-k-top-p-sampling/) |
 
 ---
 
