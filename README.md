@@ -6,6 +6,8 @@ Underneath every AI system are old, well-understood ideas: graphs, heaps, hashin
 
 This playbook takes one real AI problem at a time and works it through properly: why the problem exists, where the algorithm shows up in real systems (with sources), how to solve it and why it's correct, what breaks at scale, and C# code with tests that run.
 
+This is code for learning. It's tested and it runs, but it isn't a library to drop into production. Each topic says what it leaves out.
+
 [![tests](../../actions/workflows/test.yml/badge.svg)](../../actions/workflows/test.yml)
 
 ---
