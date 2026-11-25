@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\DynamicBatching\DynamicBatching.csproj" />
+    <ProjectReference Include="..\..\experiments\DynamicBatching.Experiments\DynamicBatching.Experiments.csproj" />
   </ItemGroup>
 
 </Project>
