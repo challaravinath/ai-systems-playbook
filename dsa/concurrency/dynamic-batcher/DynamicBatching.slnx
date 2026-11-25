@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/experiments/">
+    <Project Path="experiments/DynamicBatching.Experiments/DynamicBatching.Experiments.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/DynamicBatching/DynamicBatching.csproj" />
   </Folder>

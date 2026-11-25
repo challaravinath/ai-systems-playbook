@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="DynamicBatching.Tests" />
+    <InternalsVisibleTo Include="DynamicBatching.Experiments" />
   </ItemGroup>
 
 </Project>
