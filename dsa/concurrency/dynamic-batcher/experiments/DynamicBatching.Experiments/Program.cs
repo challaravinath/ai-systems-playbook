@@ -17,6 +17,43 @@ string outDir = Arg("--out") ?? "results";
 string? tracePath = Arg("--trace");
 Directory.CreateDirectory(outDir);
 
+// The real clock (PR 4): how long does a lone request really wait for a given T on this machine?
+//   dotnet run -c Release --project experiments/DynamicBatching.Experiments -- --real-clock
+if (args.Contains("--real-clock"))
+{
+    var clockReport = new StringBuilder();
+    void ClockLine(string text = "")
+    {
+        Console.WriteLine(text);
+        clockReport.AppendLine(text);
+    }
+
+    ClockLine("# The real clock: how long a lone request waits for T");
+    ClockLine();
+    ClockLine($"Measured on: {System.Runtime.InteropServices.RuntimeInformation.OSDescription}, " +
+              $"{System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}, " +
+              $"{Environment.ProcessorCount} logical processors, {Environment.GetEnvironmentVariable("PROCESSOR_IDENTIFIER") ?? "processor not reported"}.");
+    ClockLine($"Date: {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC. Other machines, and the same machine under other load, give other numbers.");
+    ClockLine();
+    ClockLine("Each request is sent alone, after a random 0-20 ms pause, with N = 1000 so only T can close the batch.");
+    ClockLine("Waited = from just before SubmitAsync until the batch function starts (Stopwatch). 200 requests per T, seed 1.");
+    ClockLine();
+    ClockLine("| T asked (ms) | Min | p50 | p99 | Max | Closed before T | Timers per request (mean / most) |");
+    ClockLine("|---|---|---|---|---|---|---|");
+    foreach (double t in new[] { 1.0, 2, 5, 10, 20 })
+    {
+        var row = await RealClockCheck.MeasureAsync(TimeSpan.FromMilliseconds(t), samples: 200, seed: 1);
+        ClockLine($"| {t} | {row.MinMs:0.00} | {row.P50Ms:0.00} | {row.P99Ms:0.00} | {row.MaxMs:0.00} | " +
+                  $"{row.ClosedEarly} of {row.Samples} | {row.TimersPerRequest:0.00} / {row.MostTimersForOneRequest} |");
+    }
+
+    string os = OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsLinux() ? "linux" : "other";
+    string clockFile = Path.Combine(outDir, $"real-clock-{os}.md");
+    File.WriteAllText(clockFile, clockReport.ToString());
+    Console.Error.WriteLine($"wrote {clockFile}");
+    return 0;
+}
+
 var report = new StringBuilder();
 var csv = new StringBuilder("experiment,arrivals,rate_per_s,N,T_ms,requests,batches,mean_batch,p50_ms,p99_ms,max_ms,throughput_per_s,gpu_busy_pct\n");
 var watch = Stopwatch.StartNew();

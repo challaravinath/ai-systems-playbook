@@ -100,11 +100,20 @@ public sealed class DynamicBatcher<TIn, TOut> : IAsyncDisposable
                 {
                     break;
                 }
-                if (!await WaitUntilAsync(reader, left).ConfigureAwait(false))
+                Wake wake = await WaitUntilAsync(reader, left).ConfigureAwait(false);
+                if (wake == Wake.Closed)
                 {
                     break;
                 }
-                TakeAvailable(reader, batch);
+                if (wake == Wake.More)
+                {
+                    TakeAvailable(reader, batch);
+                }
+                // Wake.TimeUp: go round again. `left` is measured again on our own clock, and the
+                // batch closes only when that says T has passed. A timer can fire early: on Windows,
+                // .NET's timers read a clock that moves once per system clock tick (Microsoft: "typically
+                // in the range of 0.5 milliseconds to 15.625 milliseconds"), so trusting the timer alone
+                // closed batches before T.
             }
 
             await RunBatchAsync(batch).ConfigureAwait(false);
@@ -129,19 +138,21 @@ public sealed class DynamicBatcher<TIn, TOut> : IAsyncDisposable
         return batch.Count > before;
     }
 
-    // True when more requests can be read, false when the time is up or the queue is closed.
-    private async Task<bool> WaitUntilAsync(ChannelReader<Pending> reader, TimeSpan left)
+    private enum Wake { More, TimeUp, Closed }
+
+    // Waits until more requests can be read, the timer fires, or the queue is closed.
+    private async Task<Wake> WaitUntilAsync(ChannelReader<Pending> reader, TimeSpan left)
     {
         using var timer = new CancellationTokenSource(left, _clock);
         // The timer callback runs on the thread that fires it, so tests see the loop wake up at once.
         using var wake = timer.Token.Register(() => _idle = false);
         try
         {
-            return await WaitForMoreAsync(reader, timer.Token).ConfigureAwait(false);
+            return await WaitForMoreAsync(reader, timer.Token).ConfigureAwait(false) ? Wake.More : Wake.Closed;
         }
         catch (OperationCanceledException) when (timer.IsCancellationRequested)
         {
-            return false;
+            return Wake.TimeUp;
         }
     }
 

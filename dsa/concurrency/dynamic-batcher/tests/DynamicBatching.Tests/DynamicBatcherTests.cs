@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Time.Testing;
+
 namespace DynamicBatching.Tests;
 
 public class DynamicBatcherTests
@@ -29,6 +31,29 @@ public class DynamicBatcherTests
         Assert.Equal(10, await a.Within());
         Assert.Equal(20, await b.Within());
         Assert.Equal("10:1,2", h.Describe());   // closed on A's clock, not B's
+    }
+
+    // Every timer fires `early` before it's due, but never sooner than 1 ms after it's set.
+    // It stands in for a Windows timer reading a clock that is up to a system tick behind.
+    private sealed class EarlyTimers(TimeSpan early) : FakeTimeProvider
+    {
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period) =>
+            base.CreateTimer(callback, state, TimeSpan.FromTicks(Math.Max((dueTime - early).Ticks, TimeSpan.TicksPerMillisecond)), period);
+    }
+
+    [Fact]
+    public async Task A_timer_that_fires_early_does_not_close_the_batch_early()
+    {
+        await using var h = new Harness(maxBatchSize: 5, maxWaitMs: 10, clock: new EarlyTimers(TimeSpan.FromMilliseconds(4)));
+
+        Task<int> a = h.Submit(1);
+        h.AdvanceMs(6);            // the timer fires here, 4 ms early
+        Assert.Empty(h.Batches);   // the loop checks its own clock: only 6 of 10 ms have passed
+
+        h.AdvanceMs(4);
+
+        Assert.Equal(10, await a.Within());
+        Assert.Equal("10:1", h.Describe());
     }
 
     [Fact]
