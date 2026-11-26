@@ -41,6 +41,7 @@ Each problem folder also has a PDF of its README for offline reading.
 | [Fewest GPUs that meet the SLO](dsa/search/fewest-gpus-for-slo/) | Binary search on the answer, doubling search, monotone checks | Azure LLM inference trace, Splitwise SLO, Triton Perf Analyzer `--binary-search` | Done, 78 tests |
 | [Per-tenant rate limiter](dsa/concurrency/per-tenant-rate-limiter/) | Token bucket with lazy refill, a hash map of buckets per customer, a lock per customer | Claude API rate limits, Azure OpenAI quotas, .NET `TokenBucketRateLimiter`, Azure LLM inference trace | Done, 31 tests |
 | [Top-k and top-p sampling](dsa/heaps/top-k-top-p-sampling/) | Size-k min-heap, heapify and pop, quickselect, stable softmax | vLLM sampler order, Hugging Face top-k / top-p warpers, nucleus sampling paper | Done, 67 tests |
+| [Dynamic batcher](dsa/concurrency/dynamic-batcher/) | Bounded channel, one reader loop, a completion slot per caller, a frozen dictionary of models | Triton dynamic batcher, Hugging Face TEI, Clipper, NVIDIA BERT batch timings, Azure LLM inference trace | Done, 59 tests |
 
 ### System design
 
@@ -73,7 +74,7 @@ I write one LinkedIn post a week about a problem in this repo. Each post links t
 
 ## Roadmap
 
-**Up next:** *Dynamic batcher*; *Pack the context window*; *Near-duplicate detection in training data*.
+**Up next:** *Pack the context window*; *Near-duplicate detection in training data*.
 
 The full plan, 25 problems and 12 system designs, is in **[ROADMAP.md](ROADMAP.md)**. Each DSA problem builds a component that a later design uses: the rate limiter and the retries become parts of the AI gateway, the radix tree and the batcher become parts of inference serving.
 
@@ -88,7 +89,7 @@ Problems are grouped by pattern, and each group is a folder under `dsa/`:
 | Search | kNN, IVF/HNSW, binary search on the answer | Vector search, the fewest GPUs that meet an SLO (done) |
 | DP and strings | Knapsack, edit distance, Viterbi | Packing the context window, word error rate, chunking |
 | Optimisation | Greedy, bin packing, assignment, scheduling | Placing models on GPUs, continuous batching |
-| Concurrency | Token buckets, locks, channels, semaphores, coalescing, circuit breakers | Per-tenant rate limiter (done), dynamic batcher, single-flight cache |
+| Concurrency | Token buckets, locks, channels, semaphores, coalescing, circuit breakers | Per-tenant rate limiter (done), dynamic batcher (done), single-flight cache |
 | Streaming and parsing | State machines, incremental parsers | Streaming tokens over SSE, parsing tool-call JSON as it arrives |
 | ML from scratch | Numerically stable maths | Softmax, attention with a KV cache, BM25, k-means |
 
