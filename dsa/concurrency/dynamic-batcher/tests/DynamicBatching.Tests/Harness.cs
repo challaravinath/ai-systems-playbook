@@ -11,9 +11,9 @@ internal sealed class Harness : IAsyncDisposable
     private readonly List<(long AtMs, int[] Items)> _batches = [];
 
     public Harness(int maxBatchSize, int maxWaitMs, int queueCapacity = 1000,
-        Func<IReadOnlyList<int>, Task<IReadOnlyList<int>>>? runBatch = null)
+        Func<IReadOnlyList<int>, Task<IReadOnlyList<int>>>? runBatch = null, FakeTimeProvider? clock = null)
     {
-        Clock = new FakeTimeProvider();
+        Clock = clock ?? new FakeTimeProvider();
         _start = Clock.GetUtcNow();
         Batcher = new DynamicBatcher<int, int>(
             new BatchOptions(maxBatchSize, TimeSpan.FromMilliseconds(maxWaitMs), queueCapacity),

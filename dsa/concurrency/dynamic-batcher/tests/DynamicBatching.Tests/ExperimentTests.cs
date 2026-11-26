@@ -147,6 +147,17 @@ public class ExperimentTests
         Assert.Equal(first, second);
     }
 
+    // On the machine's real clock. Before the fix, timers that fired early closed about 3 in 10
+    // of these batches before T (measured on Windows: 61 of 200 at T = 10 ms).
+    [Fact]
+    public async Task On_the_real_clock_no_batch_closes_before_T()
+    {
+        var row = await RealClockCheck.MeasureAsync(TimeSpan.FromMilliseconds(10), samples: 30, seed: 2);
+
+        Assert.Equal(0, row.ClosedEarly);
+        Assert.True(row.MinMs >= 10, $"shortest wait {row.MinMs} ms");
+    }
+
     [Fact]
     public void Percentile_is_the_nearest_rank()
     {
