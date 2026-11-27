@@ -109,6 +109,7 @@ I write one LinkedIn post a week about a problem in this repo. Each post links t
 | [Sizing an LLM endpoint with binary search](https://lnkd.in/p/dHHmqYjJ) | [Fewest GPUs that meet the SLO](dsa/search/fewest-gpus-for-slo/) |
 | [Per-customer rate limits for an LLM API](https://lnkd.in/p/d75dfh3m) | [Per-tenant rate limiter](dsa/concurrency/per-tenant-rate-limiter/) |
 | [How the serving engine picks each token](https://lnkd.in/p/dg4Kt4Ma) | [Top-k and top-p sampling](dsa/heaps/top-k-top-p-sampling/) |
+| [How long a model server should wait to batch](https://lnkd.in/p/ddWAQSAJ) | [Dynamic batcher](dsa/concurrency/dynamic-batcher/) |
 
 ---
 
