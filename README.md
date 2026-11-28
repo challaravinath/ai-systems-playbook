@@ -25,8 +25,6 @@ This is code for learning. It's tested and it runs, but it isn't a library to dr
 9. **From working code to production:** observability, failure, security.
 10. **Common mistakes**, and why each one hurts.
 
-Each problem folder also has a PDF of its README for offline reading.
-
 ---
 
 ## Contents
@@ -46,6 +44,48 @@ Each problem folder also has a PDF of its README for offline reading.
 ### System design
 
 Full designs of AI systems, from the architecture down to failure modes, evaluation and responsible AI. *Coming soon.*
+
+---
+
+## Repository structure
+
+```
+ai-systems-playbook/
+├── README.md                 this page
+├── ROADMAP.md                the full plan
+├── .github/workflows/        runs every test on each push
+└── dsa/                      one folder per pattern, one folder per problem
+    ├── concurrency/
+    │   ├── per-tenant-rate-limiter/
+    │   └── dynamic-batcher/
+    ├── graphs/
+    │   ├── agent-plan-executor/
+    │   └── learning-path-from-docs/
+    ├── heaps/
+    │   └── top-k-top-p-sampling/
+    ├── search/
+    │   └── fewest-gpus-for-slo/
+    └── trees-and-tries/
+        └── prefix-cache-radix-tree/
+```
+
+Every problem folder has the same shape. The dynamic batcher, for example:
+
+```
+dynamic-batcher/
+├── README.md                     the problem, what I built, what I measured
+├── DynamicBatching.slnx          the solution file
+├── src/DynamicBatching/          the code
+│   ├── DynamicBatcher.cs         the queue and the batching loop
+│   ├── ModelBatchers.cs          one batcher per model
+│   ├── BatchOptions.cs           batch size, wait time, queue size
+│   └── QueueFullException.cs
+├── tests/DynamicBatching.Tests/  the tests, on a fake clock
+└── experiments/                  the simulated GPU runs and the real-clock check
+    └── results/                  the tables the README quotes
+```
+
+Some folders also have `demo/`, which runs the code on a real trace or example, or `benchmarks/`, which times it with BenchmarkDotNet. The code in `src/` uses only the .NET base library. The tests and benchmarks use xUnit and BenchmarkDotNet from NuGet.
 
 ---
 
